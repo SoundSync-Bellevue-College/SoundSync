@@ -1,16 +1,11 @@
-// =============================================
-// mock_data.dart
-// Fake data that powers all screens.
-// When Wayne's backend is ready, we swap this
-// for real API calls — the screens don't change.
-// =============================================
+import '../models/route.dart';
 
 class NearbyRoute {
-  final String id;          // "271", "B Line", etc.
-  final String destination;  // "Seattle", "Redmond"
-  final int arrivalMin;      // minutes until bus arrives
-  final int confidence;      // AI confidence 0-100
-  final String status;       // "on-time", "early", "delayed"
+  final String id;
+  final String destination;
+  final int arrivalMin;
+  final int confidence;
+  final String status;
 
   const NearbyRoute({
     required this.id,
@@ -23,8 +18,8 @@ class NearbyRoute {
 
 class WeatherData {
   final int tempF;
-  final String condition;    // "Rain likely", "Sunny", etc.
-  final String icon;         // emoji for now
+  final String condition;
+  final String icon;
 
   const WeatherData({
     required this.tempF,
@@ -36,7 +31,7 @@ class WeatherData {
 class DepartureAlert {
   final String routeId;
   final int arrivalMin;
-  final String message;      // "Usually on time"
+  final String message;
 
   const DepartureAlert({
     required this.routeId,
@@ -46,59 +41,21 @@ class DepartureAlert {
 }
 
 class MockData {
-  // ---- HOME SCREEN DATA ----
-
   static const List<NearbyRoute> nearbyRoutes = [
-    NearbyRoute(
-      id: '271',
-      destination: 'Seattle',
-      arrivalMin: 4,
-      confidence: 94,
-      status: 'early',
-    ),
-    NearbyRoute(
-      id: 'B Line',
-      destination: 'Redmond',
-      arrivalMin: 8,
-      confidence: 87,
-      status: 'on-time',
-    ),
-    NearbyRoute(
-      id: '245',
-      destination: 'Kirkland',
-      arrivalMin: 12,
-      confidence: 91,
-      status: 'on-time',
-    ),
-    NearbyRoute(
-      id: '550',
-      destination: 'Downtown Seattle',
-      arrivalMin: 15,
-      confidence: 82,
-      status: 'delayed',
-    ),
-    NearbyRoute(
-      id: '241',
-      destination: 'Eastgate',
-      arrivalMin: 22,
-      confidence: 88,
-      status: 'on-time',
-    ),
+    NearbyRoute(id: '271', destination: 'Seattle', arrivalMin: 4, confidence: 94, status: 'early'),
+    NearbyRoute(id: 'B Line', destination: 'Redmond', arrivalMin: 8, confidence: 87, status: 'on-time'),
+    NearbyRoute(id: '245', destination: 'Kirkland', arrivalMin: 12, confidence: 91, status: 'on-time'),
+    NearbyRoute(id: '550', destination: 'Downtown Seattle', arrivalMin: 15, confidence: 82, status: 'delayed'),
+    NearbyRoute(id: '241', destination: 'Eastgate', arrivalMin: 22, confidence: 88, status: 'on-time'),
   ];
 
   static const WeatherData weather = WeatherData(
-    tempF: 48,
-    condition: 'Rain likely',
-    icon: '🌧️',
+    tempF: 48, condition: 'Rain likely', icon: '🌧️',
   );
 
   static const DepartureAlert leaveNowAlert = DepartureAlert(
-    routeId: '271',
-    arrivalMin: 4,
-    message: 'Usually on time',
+    routeId: '271', arrivalMin: 4, message: 'Usually on time',
   );
-
-  // ---- ROUTE DETAIL SCREEN DATA ----
 
   static const List<Map<String, String>> route271Stops = [
     {'name': 'Bellevue College', 'time': '3:24 PM', 'tag': 'Next stop'},
@@ -108,17 +65,22 @@ class MockData {
     {'name': 'U District', 'time': '3:52 PM', 'tag': 'Destination'},
   ];
 
-  // ---- CONNECTION CHECKER DATA ----
-
-  static const int transferSuccessRate = 94;
-  static const int tripsAnalyzed = 347;
-  static const String averageBuffer = '4 min 30 sec';
-
-  // ---- TRIP ASSISTANT SAMPLE QUESTIONS ----
-
-  static const List<String> sampleQuestions = [
-    '"Will I make my 2pm class?"',
-    '"What\'s the fastest way to UW?"',
-    '"Is the B Line on time?"',
+  static final List<TransitRoute> routes = [
+    TransitRoute(id: '271', shortName: '271', longName: 'Bellevue College to U District', color: '3B82F6', agencyName: 'King County Metro'),
+    TransitRoute(id: 'B Line', shortName: 'B Line', longName: 'RapidRide B Line', color: '10B981', agencyName: 'King County Metro'),
+    TransitRoute(id: '245', shortName: '245', longName: 'Kirkland to Bellevue', color: 'F97316', agencyName: 'King County Metro'),
+    TransitRoute(id: '550', shortName: '550', longName: 'Bellevue to Downtown Seattle', color: '8B5CF6', agencyName: 'Sound Transit'),
+    TransitRoute(id: '241', shortName: '241', longName: 'Eastgate to Bellevue TC', color: 'F59E0B', agencyName: 'King County Metro'),
+    TransitRoute(id: '556', shortName: '556', longName: 'Issaquah to U District', color: 'EC4899', agencyName: 'Sound Transit'),
   ];
+
+  static List<TransitRoute> searchRoutes(String query) {
+    if (query.isEmpty) return routes;
+    final q = query.toLowerCase();
+    return routes.where((r) =>
+      r.shortName.toLowerCase().contains(q) ||
+      r.longName.toLowerCase().contains(q) ||
+      r.agencyName.toLowerCase().contains(q)
+    ).toList();
+  }
 }
