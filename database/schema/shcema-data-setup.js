@@ -185,7 +185,7 @@ function normalizeReports(reportDocs, userIdByHandle) {
 
 print("shcema-data-setup: creating users collection + indexes");
 db.createCollection("users");
-db.users.createIndex({ handle: 1 }, { unique: true, sparse: true });
+db.users.createIndex({ username: 1 }, { unique: true, sparse: true });
 db.users.createIndex({ "notifications.enabled": 1 });
 
 print("shcema-data-setup: creating routes collection + indexes");
@@ -234,7 +234,7 @@ print("shcema-data-setup: creating users test data");
 const users = usersData.map((user) => Object.assign({ _id: new ObjectId() }, user));
 const userIdByHandle = {};
 for (const user of users) {
-    userIdByHandle[user.handle] = user._id;
+    userIdByHandle[user.username] = user._id;
 }
 db.users.insertMany(users);
 

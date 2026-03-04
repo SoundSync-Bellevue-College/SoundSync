@@ -1,6 +1,8 @@
 [
   {
-    "handle": "wayne_dev",
+    "username": "wayne_dev",
+    "name": "Wayne Dev",
+    "email": "wayne_dev@soundsync.local",
     "password": "wayne_dev_pass123",
     "createdDate": "2026-02-05T10:15:00Z",
     "notifications": {
@@ -13,7 +15,9 @@
     }
   },
   {
-    "handle": "wayne_user",
+    "username": "wayne_user",
+    "name": "Wayne User",
+    "email": "wayne_user@soundsync.local",
     "password": "wayne_user_pass123",
     "createdDate": "2025-09-18T14:30:00Z",
     "notifications": {
@@ -26,7 +30,9 @@
     }
   },
   {
-    "handle": "rider_amy",
+    "username": "rider_amy",
+    "name": "Amy Rider",
+    "email": "rider_amy@soundsync.local",
     "password": "rider_amy_pass123",
     "createdDate": "2024-06-11T08:45:00Z",
     "notifications": {
@@ -39,7 +45,9 @@
     }
   },
   {
-    "handle": "rider_ben",
+    "username": "rider_ben",
+    "name": "Ben Rider",
+    "email": "rider_ben@soundsync.local",
     "password": "rider_ben_pass123",
     "createdDate": "2023-01-27T19:20:00Z",
     "notifications": {
@@ -48,7 +56,9 @@
     }
   },
   {
-    "handle": "rider_chris",
+    "username": "rider_chris",
+    "name": "Chris Rider",
+    "email": "rider_chris@soundsync.local",
     "password": "rider_chris_pass123",
     "createdDate": "2021-04-09T12:00:00Z",
     "notifications": {
@@ -61,7 +71,9 @@
     }
   },
   {
-    "handle": "rider_dina",
+    "username": "rider_dina",
+    "name": "Dina Rider",
+    "email": "rider_dina@soundsync.local",
     "password": "rider_dina_pass123",
     "createdDate": "2020-03-15T06:10:00Z",
     "notifications": {
