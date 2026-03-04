@@ -10,6 +10,7 @@ import (
 	"soundsync/backend/internal/auth"
 	"soundsync/backend/internal/db"
 	"soundsync/backend/internal/notifications"
+	"soundsync/backend/internal/predictions"
 	"soundsync/backend/internal/reports"
 )
 
@@ -53,7 +54,9 @@ func New() (*Runtime, error) {
 		return nil, err
 	}
 
-	apiHandler := api.NewHandler(authSvc, notifSvc, delaySvc, crowdingSvc, cleanlinessSvc)
+	predictionSvc := predictions.NewService(database)
+
+	apiHandler := api.NewHandler(authSvc, notifSvc, delaySvc, crowdingSvc, cleanlinessSvc, predictionSvc)
 
 	mux := http.NewServeMux()
 	apiHandler.Register(mux)

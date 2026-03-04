@@ -5,15 +5,17 @@ import (
 
 	"soundsync/backend/internal/auth"
 	"soundsync/backend/internal/notifications"
+	"soundsync/backend/internal/predictions"
 	"soundsync/backend/internal/reports"
 )
 
 type Handler struct {
-	authSvc      *auth.Service
-	notif        *notifications.Service
-	delayRepo    *reports.DelayService
-	crowdingRepo *reports.CrowdingService
-	cleanRepo    *reports.CleanlinessService
+	authSvc       *auth.Service
+	notif         *notifications.Service
+	delayRepo     *reports.DelayService
+	crowdingRepo  *reports.CrowdingService
+	cleanRepo     *reports.CleanlinessService
+	predictionSvc *predictions.Service
 }
 
 func NewHandler(
@@ -22,13 +24,15 @@ func NewHandler(
 	delaySvc *reports.DelayService,
 	crowdingSvc *reports.CrowdingService,
 	cleanlinessSvc *reports.CleanlinessService,
+	predictionSvc *predictions.Service,
 ) *Handler {
 	return &Handler{
-		authSvc:      authSvc,
-		notif:        notifSvc,
-		delayRepo:    delaySvc,
-		crowdingRepo: crowdingSvc,
-		cleanRepo:    cleanlinessSvc,
+		authSvc:       authSvc,
+		notif:         notifSvc,
+		delayRepo:     delaySvc,
+		crowdingRepo:  crowdingSvc,
+		cleanRepo:     cleanlinessSvc,
+		predictionSvc: predictionSvc,
 	}
 }
 
@@ -50,6 +54,9 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/crowding-reports", h.listCrowdingReports)
 	mux.HandleFunc("POST /api/v1/cleanliness-reports", h.createCleanlinessReport)
 	mux.HandleFunc("GET /api/v1/cleanliness-reports", h.listCleanlinessReports)
+
+	mux.HandleFunc("GET /api/v1/predictions/delay", h.predictDelay)
+	mux.HandleFunc("GET /api/v1/predictions/crowding", h.predictCrowding)
 }
 
 func (h *Handler) health(w http.ResponseWriter, _ *http.Request) {
