@@ -1,0 +1,58 @@
+// GTFS Realtime Protocol Buffers schema — abridged for SoundSyncAI.
+// Full spec: https://gtfs.org/realtime/proto/
+
+syntax = "proto2";
+option go_package = "soundsync/api/pkg/gtfs/transit_realtime";
+
+package transit_realtime;
+
+message FeedMessage {
+  required FeedHeader header = 1;
+  repeated FeedEntity entity = 2;
+}
+
+message FeedHeader {
+  required string gtfs_realtime_version = 1;
+  optional uint64 timestamp = 2;
+}
+
+message FeedEntity {
+  required string id = 1;
+  optional bool   is_deleted = 3;
+  optional VehiclePosition vehicle = 4;
+}
+
+message VehiclePosition {
+  optional TripDescriptor   trip            = 1;
+  optional VehicleDescriptor vehicle        = 8;
+  optional Position          position       = 2;
+  optional uint64            timestamp      = 5;
+  optional OccupancyStatus   occupancy_status = 9;
+}
+
+message TripDescriptor {
+  optional string trip_id   = 1;
+  optional string route_id  = 5;
+}
+
+message VehicleDescriptor {
+  optional string id    = 1;
+  optional string label = 2;
+}
+
+message Position {
+  required float latitude  = 1;
+  required float longitude = 2;
+  optional float bearing   = 3;
+  optional float speed     = 5;
+}
+
+enum OccupancyStatus {
+  EMPTY                   = 0;
+  MANY_SEATS_AVAILABLE    = 1;
+  FEW_SEATS_AVAILABLE     = 2;
+  STANDING_ROOM_ONLY      = 3;
+  CRUSHED_STANDING_ROOM_ONLY = 4;
+  FULL                    = 5;
+  NOT_ACCEPTING_PASSENGERS = 6;
+}

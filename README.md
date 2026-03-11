@@ -1,146 +1,77 @@
-SoundSync
-Predictive transit app for Bellevue College students.
-Search routes, view stops, and see them on a map — built with Flutter + Golang + MongoDB.
+# SoundSyncAI
 
-"Transit data is broken — and nobody seems to care. Riders are left guessing, waiting, and hoping. We're fixing the data so riders finally feel seen."
+A public transit tracking and navigation app for Sound Transit (Seattle buses/rail). Think Google Maps, focused on real-time Sound Transit data.
 
+## Stack
 
-Overview
-SoundSync addresses public transit reliability challenges in the Seattle–Bellevue corridor by:
+| Layer | Technology |
+|-------|------------|
+| Frontend | Vue 3 + Vite + TypeScript + Pinia |
+| Backend | Go + chi router |
+| Database | MongoDB 7.0 |
+| Maps | Google Maps JS API |
+| Transit Data | Sound Transit GTFS-RT |
+| Weather | OpenWeatherMap API |
+| Mobile | Flutter + Riverpod |
 
-Providing real-time bus tracking with reliability scores
-Offering AI-enhanced arrival predictions using historical data
-Helping users plan routes based on actual transit performance
-Giving riders confidence scores so they know when to leave
+## Quick Start
 
-We're not competing with Google Maps on features. We're solving something Google doesn't care about: making riders feel seen.
+### Prerequisites
+- Docker & Docker Compose
+- Node.js 20+
+- Go 1.22+
+- Flutter 3.x
 
-Team
-Name:Role:Focus:  AbshiraFrontend (Flutter)Dart models, API parsing, UI screens: Wayne: Backend (Golang + MongoDB)REST endpoints, JSON contracts : Nolan: LLM Integration/llm/explain endpoint, AI predictions: Tony: Integration LeadJSON schemas, naming conventions, API docs
+### 1. Environment
+```bash
+cp .env.example .env
+# Edit .env with your API keys
+```
 
-FRONTEND (Flutter)
-  Home Screen  → Search Screen  → Route Detail 
-  Trip Assistant → Connection Checker → Crowd Intel
-                        │
-                    REST API (HTTPS)
-                        │
-BACKEND (Golang + Gin)
-  GET /routes?query=    GET /route/:id    POST /llm/explain
-                        │
-                      MongoDB
-                        │
-EXTERNAL SERVICES
-  Google Maps SDK    King County Metro GTFS    LLM API (Claude/OpenAI)
+### 2. Database
+```bash
+docker compose up -d
+# MongoDB on :27017, mongo-express on :8081
+```
 
-Tech Stack
-Layer Technology Purpose Frontend Flutter (Dart)Cross-platform mobile + web appState ManagementRiverpodReactive state with providers Navigation GoRouter Declarative routing Maps Google Maps SDKRoute visualization, stop markersBackendGolang (Gin)REST API server Database MongoDB Route, stop, and schedule dataLLMClaude / OpenAI APIAI-powered transit predictions Transit DataKing County Metro GTFSStatic schedules + real-time feeds
+### 3. Backend
+```bash
+cd api
+go mod download
+go run main.go
+# API on :8080
+```
 
-Screens
-Screen Status Description Home: BuiltRoute list with search, reliability scoresSearch:  BuiltFilter routes by name or numberRoute Detail: BuiltMap view with stops, arrival times, confidenceTrip Assistant PlannedAI chatbot — "Will I make my 2pm class?"Connection Checker PlannedTransfer success rates between routesCrowd Intel PlannedCommunity-reported delays and conditionsAlternative Routes PlannedDelay alerts with backup route optionsAI Route Finder PlannedSmart trip planning with AI reasoning
+### 4. Frontend
+```bash
+cd web
+npm install
+npm run dev
+# App on :5173
+```
 
-API Endpoints
-Method Endpoint Owner Description GET/routes? query= Wayne Search routes, returns listGET/route/:id WayneRoute detail with stops and schedule POST/ llm/ explain NolanA I-powered route explanation
-All endpoints return standardized JSON with consistent field naming, date formats (ISO 8601), and coordinate formats ({ lat, lng }). See Tony's API documentation for full schemas.
-
-Quick Start
-1. Install Flutter
-macOS:
-bashbrew install flutter
-Windows:
-Download from https://docs.flutter.dev/get-started/install/windows
-Linux:
-bashsudo snap install flutter --classic
-Verify:
-bashflutter doctor
-2. Clone and Run
-bashgit clone <repo-url>
-cd soundsync
+### 5. Mobile (optional)
+```bash
+cd mobile
 flutter pub get
 flutter run
-Run on specific device:
-bashflutter run -d chrome        # Web browser
-flutter run -d android       # Android emulator
-flutter run -d ios           # iOS simulator (macOS only)
-3. Google Maps Setup
+```
 
-Get an API key from Google Cloud Console
-Enable Maps SDK for Android, Maps SDK for iOS, and Maps JavaScript API
-Add your key:
+## Project Structure
 
-Android — android/app/src/main/AndroidManifest.xml:
-xml<meta-data android:name="com.google.android.geo.API_KEY"
-           android:value="YOUR_API_KEY"/>
-iOS — ios/Runner/AppDelegate.swift:
-swiftGMSServices.provideAPIKey("YOUR_API_KEY")
-Web — web/index.html:
-html<script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY"></script>
+```
+SoundSyncWS/
+├── web/        # Vue 3 + Vite frontend
+├── api/        # Go REST API
+├── mobile/     # Flutter app
+├── database/   # MongoDB init scripts & schemas
+└── docs/       # API reference & setup guide
+```
 
-4. Backend (Wayne)
-bashcd backend/
-go run main.go
-Backend runs on http://localhost:8080 by default.
+## API Reference
 
-5. Environment Config
-The app uses mock data by default. To connect to the live backend, update lib/config/api_config.dart:
-dartstatic const bool useMockData = false;  // flip to true for mock
-static const String baseUrl = 'http://10.0.2.2:8080';  // Android emulator
-// static const String baseUrl = 'http://localhost:8080';  // iOS / Web
+See [docs/api.md](docs/api.md) for full endpoint documentation.
 
-Project Structure
-soundsync/
-├── lib/
-│   ├── config/
-│   │   ├── api_config.dart       # Base URL, mock toggle
-│   │   ├── router.dart           # GoRouter routes
-│   │   └── theme.dart            # App colors and styles
-│   ├── data/
-│   │   ├── models/
-│   │   │   ├── route.dart        # Route data model
-│   │   │   ├── stop.dart         # Stop data model
-│   │   │   └── arrival.dart      # Arrival prediction model
-│   │   ├── services/
-│   │   │   └── api_service.dart  # HTTP client (Dio)
-│   │   └── mock/
-│   │       └── mock_data.dart    # Hardcoded test data
-│   ├── screens/
-│   │   ├── home/                 # Home screen ✅
-│   │   ├── search/               # Search screen ✅
-│   │   ├── route_detail/         # Route detail + map ✅
-│   │   ├── trip_assistant/       # AI chatbot 🔲
-│   │   ├── connection_checker/   # Transfer checker 🔲
-│   │   └── crowd_intel/          # Community reports 🔲
-│   └── main.dart
-├── android/
-├── ios/
-├── web/
-├── pubspec.yaml
-└── README.md
+## Setup Guide
 
-Sprint Progress
-Sprint Period Focus Status Sprint 1 Jan 7–20 Design — UI screens, SRS, presentation Complete Sprint 2 Jan 23 – Feb 7 Setup — Flutter project, map, bus stops Complete Sprint 3 Feb 8– 21 Core — Routes, arrivals, navigation In Progress Sprint 4 Feb 22 – Mar 7 Live Data — GTFS-RT integration Upcoming Sprint 5 Mar 8–21 Polish — Presentation - ready prototype Upcoming
-
-What's Done
-
-Flutter project scaffolded with Riverpod + GoRouter
-3 core screens built (Home, Search, Route Detail)
-Dart models matching API JSON contract
-Google Maps integration with stop markers
-Mock data layer for development without backend
-Standardized API contract defined across team
-
-What's Next
-
-Connect to live Golang backend API
-Integrate LLM endpoint for Trip Assistant
-Build remaining screens (Trip Assistant, Connection Checker, Crowd Intel)
-King County Metro GTFS-RT real-time feed integration
-Push notifications for departure alerts
-UI polish, animations, and error handling
-
-
-Key Features (Planned)
-FeatureDescriptionReliability ScoresConfidence percentages on arrival times based on historical dataTransit CopilotAI chatbot — ask "Will I make my 2pm class?" and get a real answerGhost Bus DetectionVisual overlay showing predicted bus position in 1/3/5 minutesConnection CheckerTransfer success rates — "94% based on 347 trips"Predictive AlertsLearns your routine, warns you before you're lateCrowd IntelCommunity-reported conditions and delays
-
-Data Sources
-SourceTypeUsageKing County Metro GTFSStatic + Real-timeRoutes, stops, schedules, live positionsGoogle Maps SDKMapsRoute visualization, stop markersLLM APIAINatural language predictions and explanations
-
+See [docs/setup.md](docs/setup.md) for detailed environment setup instructions.
