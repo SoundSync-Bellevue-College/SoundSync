@@ -1,6 +1,21 @@
 version: "3.9"
 
 services:
+  postgres:
+    image: postgres:16
+    container_name: soundsync_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${PG_DBNAME:-soundsync}
+      POSTGRES_USER: ${PG_USER:-postgres}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - soundsync_net
+
   mongo:
     image: mongo:7.0
     container_name: soundsync_mongo
@@ -37,6 +52,8 @@ services:
 volumes:
   mongo_data:
     name: soundsync_mongo_data
+  postgres_data:
+    name: soundsync_postgres_data
 
 networks:
   soundsync_net:
