@@ -32,6 +32,22 @@ services:
     networks:
       - soundsync_net
 
+  transit-poller:
+    build: ./transit-poller
+    container_name: soundsync_poller
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    environment:
+      OBA_API_KEY: ${OBA_API_KEY:-TEST}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${PG_DBNAME:-soundsync}
+      DB_USER: ${PG_USER:-postgres}
+      DB_PASSWORD: ${PG_PASSWORD:-postgres}
+    networks:
+      - soundsync_net
+
   mongo-express:
     image: mongo-express:1.0
     container_name: soundsync_mongo_express
