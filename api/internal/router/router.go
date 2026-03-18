@@ -3,6 +3,7 @@ package router
 import (
 	"database/sql"
 	"net/http"
+	"os"
 
 	"soundsync/api/internal/config"
 	"soundsync/api/internal/handlers"
@@ -25,7 +26,7 @@ func New(cfg *config.Config, db *mongo.Database, pgDB *sql.DB) http.Handler {
 	r.Use(chimiddleware.Logger)
 	r.Use(chimiddleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:5173", "http://localhost:4173"},
+		AllowedOrigins:   []string{"http://localhost:5173", "http://localhost:4173", "http://localhost:3003"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
 		AllowCredentials: true,
@@ -115,6 +116,21 @@ func New(cfg *config.Config, db *mongo.Database, pgDB *sql.DB) http.Handler {
 			r.Get("/reports", userH.GetReports)
 		})
 	})
+
+	// Serve the built Vite frontend (../web/dist relative to the api binary)
+	staticDir := "../web/dist"
+	if _, err := os.Stat(staticDir); err == nil {
+		fs := http.FileServer(http.Dir(staticDir))
+		r.Get("/*", func(w http.ResponseWriter, req *http.Request) {
+			path := staticDir + req.URL.Path
+			if _, err := os.Stat(path); os.IsNotExist(err) {
+				// SPA fallback
+				http.ServeFile(w, req, staticDir+"/index.html")
+				return
+			}
+			fs.ServeHTTP(w, req)
+		})
+	}
 
 	return r
 }
