@@ -46,32 +46,50 @@ class WeatherChip extends ConsumerWidget {
     return weatherAsync.when(
       data: (w) {
         final temp = (w['temp'] as num?)?.round() ?? '--';
-        final emoji = _weatherEmoji(w['description'] as String? ?? '');
+        final description = w['description'] as String? ?? '';
+        final emoji = _weatherEmoji(description);
+        final shortDesc = _shortDescription(description);
         return Material(
-          elevation: 6,
-          borderRadius: BorderRadius.circular(24),
+          elevation: 8,
+          borderRadius: BorderRadius.circular(16),
           color: Colors.transparent,
+          shadowColor: const Color(0x1F000000),
           child: InkWell(
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(16),
             onTap: () => _showHourlySheet(context, ref, coords),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: const Color(0xE6122340),
-                borderRadius: BorderRadius.circular(24),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(emoji, style: const TextStyle(fontSize: 18)),
-                  const SizedBox(width: 6),
-                  Text(
-                    '$temp°F',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
+                  Text(emoji, style: const TextStyle(fontSize: 28)),
+                  const SizedBox(width: 10),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '$temp°F',
+                        style: const TextStyle(
+                          color: Color(0xFF111827),
+                          fontWeight: FontWeight.w800,
+                          fontSize: 20,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      Text(
+                        shortDesc,
+                        style: const TextStyle(
+                          color: Color(0xFF6B7280),
+                          fontWeight: FontWeight.w500,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -82,6 +100,21 @@ class WeatherChip extends ConsumerWidget {
       loading: () => const SizedBox.shrink(),
       error: (_, __) => const SizedBox.shrink(),
     );
+  }
+
+  static String _shortDescription(String forecast) {
+    final f = forecast.toLowerCase();
+    if (f.contains('thunder')) return 'Thunderstorm';
+    if (f.contains('snow') || f.contains('blizzard')) return 'Snow likely';
+    if (f.contains('rain') || f.contains('shower') || f.contains('drizzle')) return 'Rain likely';
+    if (f.contains('fog')) return 'Foggy';
+    if (f.contains('haze') || f.contains('mist')) return 'Hazy';
+    if (f.contains('wind')) return 'Windy';
+    if (f.contains('partly cloudy') || f.contains('partly sunny')) return 'Partly cloudy';
+    if (f.contains('mostly cloudy') || f.contains('overcast')) return 'Cloudy';
+    if (f.contains('cloudy')) return 'Cloudy';
+    if (f.contains('sunny') || f.contains('clear')) return 'Clear';
+    return forecast.isEmpty ? '—' : forecast;
   }
 
   void _showHourlySheet(

@@ -32,55 +32,50 @@ class SoundSyncApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Restore saved session before rendering; show splash while loading.
     final restore = ref.watch(authRestoreProvider);
 
     return MaterialApp.router(
       title: 'SoundSyncAI',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark(useMaterial3: true).copyWith(
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF7FDBFF),
-          secondary: Color(0xFF7FDBFF),
-          surface: Color(0xFF122340),
+      theme: ThemeData(
+        useMaterial3: true,
+        brightness: Brightness.light,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF1A56DB),
+          brightness: Brightness.light,
         ),
-        scaffoldBackgroundColor: const Color(0xFF0D1B2A),
+        scaffoldBackgroundColor: const Color(0xFFF8F9FB),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: const Color(0xFF122340),
+          fillColor: Colors.white,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Colors.white12),
+            borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Colors.white12),
+            borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFF7FDBFF), width: 1.5),
+            borderSide: const BorderSide(color: Color(0xFF1A56DB), width: 1.5),
           ),
-          labelStyle: const TextStyle(color: Colors.white54),
-          hintStyle: const TextStyle(color: Colors.white38),
+          labelStyle: const TextStyle(color: Color(0xFF6B7280)),
+          hintStyle: const TextStyle(color: Color(0xFFADB5C0)),
         ),
         filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(
-            backgroundColor: const Color(0xFF7FDBFF),
-            foregroundColor: const Color(0xFF0D1B2A),
-            textStyle: const TextStyle(
-                fontWeight: FontWeight.bold, fontSize: 15),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
+            backgroundColor: const Color(0xFF1A56DB),
+            foregroundColor: Colors.white,
+            textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             minimumSize: const Size(double.infinity, 52),
           ),
         ),
       ),
       routerConfig: _router,
-      // Show a full-screen splash while restoring the session
       builder: (context, child) {
-        if (restore.isLoading) {
-          return const _SplashScreen();
-        }
+        if (restore.isLoading) return const _SplashScreen();
         return child ?? const SizedBox.shrink();
       },
     );
@@ -93,25 +88,24 @@ class _SplashScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
-      backgroundColor: Color(0xFF0D1B2A),
+      backgroundColor: Color(0xFFF8F9FB),
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.directions_transit_filled,
-                size: 56, color: Color(0xFF7FDBFF)),
+            Icon(Icons.directions_transit_filled, size: 56, color: Color(0xFF1A56DB)),
             SizedBox(height: 16),
             Text(
               'SoundSyncAI',
               style: TextStyle(
-                color: Colors.white,
+                color: Color(0xFF111827),
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.2,
               ),
             ),
             SizedBox(height: 32),
-            CircularProgressIndicator(color: Color(0xFF7FDBFF)),
+            CircularProgressIndicator(color: Color(0xFF1A56DB)),
           ],
         ),
       ),
