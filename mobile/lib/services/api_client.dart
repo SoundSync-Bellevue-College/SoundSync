@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 // Use PC's LAN IP for real device; use 10.0.2.2 for emulator
-const _baseUrl = 'http://10.1.10.179:8080/api/v1';
+const _baseUrl = 'http://localhost:8080/api/v1';
 const _storage = FlutterSecureStorage();
 
 Dio buildApiClient() {

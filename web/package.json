@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "test": "vitest run",
     "build": "vue-tsc && vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext .vue,.ts,.tsx --fix"
@@ -20,8 +21,12 @@
     "@types/google.maps": "^3.55.9",
     "@types/node": "^20.14.9",
     "@vitejs/plugin-vue": "^5.0.5",
+    "@vue/test-utils": "^2.4.6",
+    "axios-mock-adapter": "^2.1.0",
+    "jsdom": "^29.0.2",
     "typescript": "^5.2.2",
     "vite": "^5.3.1",
+    "vitest": "^4.1.4",
     "vue-tsc": "^2.0.21"
   }
 }
