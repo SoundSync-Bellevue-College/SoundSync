@@ -87,8 +87,8 @@ List<LatLng> _decodePolyline(String encoded) {
 const _seattle = LatLng(47.6062, -122.3321);
 
 // Radius (in miles) used to filter nearby vehicles around the user.
-const double _kNearbyRadiusMiles = 1.0;
-const double _kFollowUserZoom    = 13.8; // shows ~1.5-2 mi wide so nearby buses are visible on screen
+const double _kNearbyRadiusMiles = 0.5;
+const double _kFollowUserZoom    = 15.0; // ~0.5 mi radius visible on screen
 
 // Simple equirectangular distance in miles (plenty accurate for ~1mi scale)
 double _distanceMiles(double lat1, double lng1, double lat2, double lng2) {
@@ -825,15 +825,32 @@ class _DefaultBottomPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Build a list of nearby vehicles enriched with distance (miles).
-    // Dedupe by vehicleId in case the feed echoes duplicates.
-    final List<_NearbyVehicle> nearby = [];
-    final seenVehicleIds = <String>{};
+    // Backend returns multiple historical snapshots per vehicle, so dedupe
+    // by vehicleId keeping only the newest snapshot, and drop stale ones.
+    final Map<String, Map<String, dynamic>> newestByVehicle = {};
     for (final v in vehicles) {
+      final id = (v['vehicleId'] as String?) ?? '';
+      if (id.isEmpty) continue;
+      final existing = newestByVehicle[id];
+      if (existing == null) {
+        newestByVehicle[id] = v;
+      } else {
+        final tNew = DateTime.tryParse((v['timestamp'] as String?) ?? '');
+        final tOld = DateTime.tryParse((existing['timestamp'] as String?) ?? '');
+        if (tNew != null && (tOld == null || tNew.isAfter(tOld))) {
+          newestByVehicle[id] = v;
+        }
+      }
+    }
+    final now = DateTime.now().toUtc();
+    final List<_NearbyVehicle> nearby = [];
+    for (final v in newestByVehicle.values) {
       final vehicleId = (v['vehicleId'] as String?) ?? '';
       final routeId   = (v['routeId']   as String?) ?? '';
       final shortName = RoutesLookup.instance.shortName(routeId);
       if (vehicleId.isEmpty || shortName.isEmpty) continue;
-      if (!seenVehicleIds.add(vehicleId)) continue; // skip duplicates
+      final ts = DateTime.tryParse((v['timestamp'] as String?) ?? '');
+      if (ts == null || now.difference(ts.toUtc()).inMinutes >= 10) continue;
       final lat = (v['lat'] as num?)?.toDouble();
       final lng = (v['lng'] as num?)?.toDouble();
       if (lat == null || lng == null) continue;
@@ -841,10 +858,13 @@ class _DefaultBottomPanel extends StatelessWidget {
       final double? dist = (userLat != null && userLng != null)
           ? _distanceMiles(userLat!, userLng!, lat, lng)
           : null;
+      // Skip buses outside the nearby radius so "Buses near you" stays honest.
+      if (dist != null && dist > _kNearbyRadiusMiles) continue;
       nearby.add(_NearbyVehicle(
         vehicleId: vehicleId,
         routeId:   routeId,
         shortName: shortName,
+        description: RoutesLookup.instance.description(routeId),
         lat: lat, lng: lng,
         distanceMiles: dist,
       ));
@@ -862,9 +882,12 @@ class _DefaultBottomPanel extends StatelessWidget {
         boxShadow: [BoxShadow(color: Color(0x18000000), blurRadius: 20, offset: Offset(0, -4))],
       ),
       // ListView tied to DraggableScrollableSheet's controller: pulling the
-      // sheet and scrolling the list are unified gestures.
+      // sheet and scrolling the list are unified gestures. ClampingScrollPhysics
+      // prevents the rubber-band overscroll that can cause the sheet to get
+      // "stuck" in the expanded position on iOS-like physics.
       child: ListView(
         controller: scrollController,
+        physics: const ClampingScrollPhysics(),
         padding: EdgeInsets.zero,
         children: [
           // Drag handle
@@ -935,6 +958,7 @@ class _NearbyVehicle {
   final String vehicleId;
   final String routeId;
   final String shortName;
+  final String description; // e.g. "Kinnear - Downtown Seattle"
   final double lat;
   final double lng;
   final double? distanceMiles;
@@ -942,6 +966,7 @@ class _NearbyVehicle {
     required this.vehicleId,
     required this.routeId,
     required this.shortName,
+    required this.description,
     required this.lat,
     required this.lng,
     required this.distanceMiles,
@@ -962,60 +987,110 @@ class _NearbyBusRow extends StatelessWidget {
             ? 'Here'
             : '${dist.toStringAsFixed(1)} mi away';
 
+    // Convert "Kinnear - Downtown Seattle" to "Kinnear → Downtown Seattle"
+    final prettyDescription = vehicle.description.replaceAll(' - ', ' → ');
+
+    // Pill width adapts to short name length so long names like "H Line"
+    // or "C Line" don't crowd the text next to them.
+    final pillWidth = vehicle.shortName.length > 3 ? 72.0 : 60.0;
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
         child: Row(
           children: [
-            // Route pill
+            // Route pill — bigger and bolder
             Container(
-              width: 52, height: 36,
+              width: pillWidth, height: 46,
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: _kPrimary,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
                 vehicle.shortName,
                 style: const TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 17,
                 ),
               ),
             ),
-            const SizedBox(width: 12),
-            // Vehicle info
+            const SizedBox(width: 14),
+            // Route info
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'Route ${vehicle.shortName}',
-                    style: const TextStyle(color: _kText, fontSize: 15, fontWeight: FontWeight.w700),
+                    style: const TextStyle(
+                      color: _kText,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Vehicle ${vehicle.vehicleId}',
-                    style: const TextStyle(color: _kSubtext, fontSize: 12),
-                  ),
+                  if (prettyDescription.isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      prettyDescription,
+                      style: const TextStyle(
+                        color: _kSubtext,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ],
               ),
             ),
-            // Distance
+            const SizedBox(width: 8),
+            // Distance + live label + chevron
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
                   distLabel,
-                  style: const TextStyle(color: _kText, fontSize: 14, fontWeight: FontWeight.w700),
+                  style: const TextStyle(
+                    color: _kText,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-                const SizedBox(height: 2),
-                const Text(
-                  'Live',
-                  style: TextStyle(color: _kAccent, fontSize: 11, fontWeight: FontWeight.w600),
+                const SizedBox(height: 3),
+                Row(
+                  children: [
+                    Container(
+                      width: 6, height: 6,
+                      decoration: const BoxDecoration(
+                        color: _kAccent,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Text(
+                      'Live',
+                      style: TextStyle(
+                        color: _kAccent,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
               ],
+            ),
+            const SizedBox(width: 6),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: _kSubtext,
+              size: 22,
             ),
           ],
         ),

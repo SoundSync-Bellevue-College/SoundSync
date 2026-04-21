@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../services/routes_lookup.dart';
+import '../services/api_client.dart';
 
 // ─── Design Tokens (matches home_screen.dart) ─────────────────────────────────
 const _kPrimary    = Color(0xFF1A56DB);
@@ -25,22 +27,36 @@ class _RouteDetailScreenState extends State<RouteDetailScreen>
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
-  // Mock data — will be replaced with live API data
-  final String _routeShortName = '271';
-  final String _origin         = 'Bellevue College';
-  final String _destination    = 'U District';
-  final int _confidence        = 94;
-  final int _arrivingInMinutes = 4;
-  final String _expectedTime   = '3:24 PM';
-  final String _scheduledTime  = '3:26 PM';
+  // Real data from the route that was tapped. The routeId looks like
+  // "1_100001" — we pass it through RoutesLookup to get the short name
+  // (e.g. "271", "C Line", "H Line").
+  String get _routeShortName {
+    final decoded = Uri.decodeComponent(widget.routeId);
+    final short = RoutesLookup.instance.shortName(decoded);
+    return short.isNotEmpty ? short : decoded;
+  }
 
-  final List<_StopData> _upcomingStops = [
-    _StopData(name: 'Bellevue College',     time: '3:24 PM', isNext: true,  weather: '48°F'),
-    _StopData(name: 'Eastgate P&R',         time: '3:31 PM', isNext: false, weather: '48°F'),
-    _StopData(name: 'Mercer Island P&R',    time: '3:38 PM', isNext: false, weather: null),
-    _StopData(name: 'Rainier Ave & S Dearborn', time: '3:44 PM', isNext: false, weather: null),
-    _StopData(name: 'U District Station',   time: '3:52 PM', isNext: false, weather: null),
-  ];
+  // ─── Live data from backend ────────────────────────────────────────────────
+  // The route's origin/destination is looked up from the bundled GTFS routes.csv.
+  String get _origin {
+    final desc = RoutesLookup.instance.description(_rawRouteId);
+    if (desc.contains(' - ')) return desc.split(' - ').first.trim();
+    return 'Origin';
+  }
+  String get _destination {
+    final desc = RoutesLookup.instance.description(_rawRouteId);
+    if (desc.contains(' - ')) return desc.split(' - ').last.trim();
+    return 'Destination';
+  }
+
+  // routeId as it came in from the Home screen (already URL-decoded).
+  String get _rawRouteId => Uri.decodeComponent(widget.routeId);
+
+  // Live vehicles on this route (refreshed every 10s).
+  List<Map<String, dynamic>> _liveVehicles = [];
+  bool _loadingVehicles = true;
+  String? _vehiclesError;
+  Timer? _refreshTimer;
 
   // Bus position on timeline (0.0 = Now, 1.0 = 4m)
   double _busPosition = 0.18;
@@ -71,23 +87,115 @@ class _RouteDetailScreenState extends State<RouteDetailScreen>
         });
       }
     });
+
+    // Fetch live vehicle data for this route now + every 10s.
+    _fetchLiveVehicles();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) _fetchLiveVehicles();
+    });
+  }
+
+  Future<void> _fetchLiveVehicles() async {
+    try {
+      final dio = buildApiClient();
+      final resp = await dio.get('/transit/vehicles');
+      final all = (resp.data['vehicles'] as List<dynamic>?) ?? [];
+      // The backend's routeId in /vehicles comes back without the agency prefix
+      // (e.g. "100252") while we may get called with an agency-prefixed id
+      // ("1_100252"). Compare on the numeric tail to match either shape.
+      final targetTail = _rawRouteId.split('_').last;
+      final matching = all
+          .whereType<Map<String, dynamic>>()
+          .where((v) => (v['routeId']?.toString() ?? '').split('_').last == targetTail)
+          .toList();
+
+      // Dedupe by vehicleId, keeping the snapshot with the latest timestamp.
+      // The backend currently returns historical snapshots, not just live
+      // positions, so without this we'd massively overcount active buses.
+      final Map<String, Map<String, dynamic>> newestByVehicle = {};
+      for (final v in matching) {
+        final id = (v['vehicleId'] as String?) ?? '';
+        if (id.isEmpty) continue;
+        final existing = newestByVehicle[id];
+        if (existing == null) {
+          newestByVehicle[id] = v;
+        } else {
+          final tNew = DateTime.tryParse((v['timestamp'] as String?) ?? '');
+          final tOld = DateTime.tryParse((existing['timestamp'] as String?) ?? '');
+          if (tNew != null && (tOld == null || tNew.isAfter(tOld))) {
+            newestByVehicle[id] = v;
+          }
+        }
+      }
+
+      // Filter to only "recent" snapshots (within the last 10 minutes) so
+      // stale historical data doesn't inflate the live count.
+      final now = DateTime.now().toUtc();
+      final recent = newestByVehicle.values.where((v) {
+        final t = DateTime.tryParse((v['timestamp'] as String?) ?? '');
+        if (t == null) return false;
+        return now.difference(t.toUtc()).inMinutes < 10;
+      }).toList();
+
+      if (!mounted) return;
+      setState(() {
+        _liveVehicles    = recent;
+        _loadingVehicles = false;
+        _vehiclesError   = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadingVehicles = false;
+        _vehiclesError = 'Could not load live data';
+      });
+    }
+  }
+
+  // Headline shown on the AI Prediction card. Real ETAs require a stopId
+  // (which we don't have without a /transit/routes/{id}/stops endpoint), so
+  // for now we show live vehicle count + occupancy, which *is* real data.
+  String get _headlineText {
+    if (_loadingVehicles) return 'Loading live data…';
+    if (_vehiclesError != null) return _vehiclesError!;
+    if (_liveVehicles.isEmpty) return 'No buses on this route right now';
+    final n = _liveVehicles.length;
+    return n == 1 ? '1 bus in service' : '$n buses in service';
+  }
+
+  String get _subHeadlineText {
+    if (_liveVehicles.isEmpty) return '';
+    final first = _liveVehicles.first;
+    final occ = (first['occupancyStatus'] as String?) ?? '';
+    final speed = (first['speed'] as num?)?.toDouble() ?? 0;
+    final readableOcc = switch (occ) {
+      'EMPTY'             => 'Empty',
+      'MANY_SEATS_AVAILABLE' => 'Plenty of seats',
+      'FEW_SEATS_AVAILABLE'  => 'A few seats',
+      'STANDING_ROOM_ONLY'   => 'Standing room only',
+      'CRUSHED_STANDING_ROOM_ONLY' => 'Very crowded',
+      'FULL'              => 'Full',
+      'NOT_ACCEPTING_PASSENGERS' => 'Not picking up',
+      'STOPPED_AT'        => 'At a stop',
+      'IN_TRANSIT_TO'     => 'In transit',
+      _                   => 'Live',
+    };
+    if (speed > 0) {
+      return '$readableOcc · Moving ${speed.toStringAsFixed(0)} mph';
+    }
+    return readableOcc;
   }
 
   @override
   void dispose() {
     _pulseController.dispose();
     _timer?.cancel();
+    _refreshTimer?.cancel();
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.dark,
     ));
     super.dispose();
-  }
-
-  Color get _confidenceColor {
-    if (_confidence >= 90) return _kAccent;
-    if (_confidence >= 75) return _kUrgentText;
-    return Colors.red;
   }
 
   @override
@@ -195,14 +303,35 @@ class _RouteDetailScreenState extends State<RouteDetailScreen>
     );
   }
 
-  // ── AI Prediction Card ─────────────────────────────────────────────────────
+  // ── Live Status Card ───────────────────────────────────────────────────────
+  // Shows real data from the /transit/vehicles feed. When a stops/arrivals
+  // endpoint is available, this becomes a full ETA prediction card.
   Widget _buildAIPredictionCard() {
+    final hasLive = _liveVehicles.isNotEmpty;
+    final isError = _vehiclesError != null;
+    final Color cardBg = isError
+        ? const Color(0xFFFEF2F2)
+        : hasLive
+            ? const Color(0xFFE8F7EC)
+            : const Color(0xFFF3F4F6);
+    final Color borderColor = isError
+        ? Colors.red.withOpacity(0.2)
+        : hasLive
+            ? _kAccent.withOpacity(0.18)
+            : _kBorder;
+    final Color headlineColor = isError
+        ? Colors.red.shade700
+        : hasLive
+            ? const Color(0xFF065F46)
+            : _kText;
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: _kSurface,
+        color: cardBg,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: const [BoxShadow(color: Color(0x0F000000), blurRadius: 12, offset: Offset(0, 4))],
+        border: Border.all(color: borderColor),
+        boxShadow: const [BoxShadow(color: Color(0x0A000000), blurRadius: 10, offset: Offset(0, 3))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -210,67 +339,86 @@ class _RouteDetailScreenState extends State<RouteDetailScreen>
           // Header row
           Row(
             children: [
-              Container(
-                width: 32, height: 32,
-                decoration: BoxDecoration(
-                  color: _kPrimary.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Center(child: Text('🤖', style: TextStyle(fontSize: 16))),
+              Text(hasLive ? '🛰️' : '🚌', style: const TextStyle(fontSize: 20)),
+              const SizedBox(width: 8),
+              Text(
+                hasLive ? 'Live Tracking' : 'Service Status',
+                style: TextStyle(color: headlineColor, fontSize: 15, fontWeight: FontWeight.w700),
               ),
-              const SizedBox(width: 10),
-              const Text('AI Prediction',
-                  style: TextStyle(color: _kSubtext, fontSize: 14, fontWeight: FontWeight.w600)),
               const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: _kAccent.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: _kAccent.withOpacity(0.3)),
+              if (hasLive)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _kAccent,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ScaleTransition(
+                        scale: _pulseAnimation,
+                        child: Container(
+                          width: 6, height: 6,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Text('LIVE',
+                          style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+                    ],
+                  ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(width: 6, height: 6,
-                        decoration: BoxDecoration(color: _kAccent, shape: BoxShape.circle)),
-                    const SizedBox(width: 5),
-                    Text('$_confidence% Confident',
-                        style: TextStyle(color: _confidenceColor, fontSize: 12, fontWeight: FontWeight.w700)),
-                  ],
-                ),
-              ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
 
-          // Arriving in X min — big
+          // Headline text — live vehicle count or loading/error state
           Text(
-            'Arriving in $_arrivingInMinutes min',
+            _headlineText,
             style: TextStyle(
-              color: _confidenceColor,
-              fontSize: 28,
+              color: headlineColor,
+              fontSize: 26,
               fontWeight: FontWeight.w800,
-              letterSpacing: -0.5,
+              letterSpacing: -0.4,
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Expected at $_expectedTime — ${_scheduledTime == _expectedTime ? "on time" : "2 min earlier than scheduled"}',
-            style: const TextStyle(color: _kSubtext, fontSize: 13),
-          ),
+          if (_subHeadlineText.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              _subHeadlineText,
+              style: const TextStyle(color: Color(0xFF4B5563), fontSize: 14, fontWeight: FontWeight.w500),
+            ),
+          ],
           const SizedBox(height: 14),
 
-          // Factor chips
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _FactorChip(emoji: '🚦', label: 'Light traffic'),
-              _FactorChip(emoji: '🌧', label: 'Rain +1m'),
-              _FactorChip(emoji: '📊', label: '97% historical'),
-            ],
-          ),
+          // Real info chips — data we actually have
+          if (hasLive) ...[
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _FactorChip(
+                  emoji: '🚌',
+                  label: 'Vehicle ${_liveVehicles.first['vehicleId'] ?? '—'}',
+                ),
+                if ((_liveVehicles.first['tripId'] as String?)?.isNotEmpty ?? false)
+                  _FactorChip(
+                    emoji: '🧭',
+                    label: 'Trip ${_liveVehicles.first['tripId']}',
+                  ),
+                _FactorChip(
+                  emoji: '📡',
+                  label: _liveVehicles.length > 1
+                      ? '${_liveVehicles.length} buses tracked'
+                      : 'Updated every 10s',
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -356,15 +504,19 @@ class _RouteDetailScreenState extends State<RouteDetailScreen>
           }),
           const SizedBox(height: 12),
 
-          // Approaching text
+          // Approaching text — shows speed of the first live vehicle
           Row(
             children: [
               Container(width: 8, height: 8,
                   decoration: BoxDecoration(color: _kAccent, shape: BoxShape.circle)),
               const SizedBox(width: 6),
-              Text(
-                'Bus approaching — ${(_arrivingInMinutes * (1 - _busPosition)).toStringAsFixed(1)} miles away',
-                style: const TextStyle(color: _kSubtext, fontSize: 12),
+              Expanded(
+                child: Text(
+                  _liveVehicles.isNotEmpty
+                      ? 'Live position — updated ${_relativeTime(_liveVehicles.first['timestamp'])}'
+                      : 'Waiting for live data…',
+                  style: const TextStyle(color: _kSubtext, fontSize: 12),
+                ),
               ),
             ],
           ),
@@ -407,7 +559,24 @@ class _RouteDetailScreenState extends State<RouteDetailScreen>
     }).toList();
   }
 
+  // Converts an ISO 8601 timestamp into a short relative-time string.
+  // Example: "2026-04-20T21:15:52Z" → "12s ago" or "2m ago".
+  String _relativeTime(dynamic rawTimestamp) {
+    if (rawTimestamp is! String) return 'just now';
+    final parsed = DateTime.tryParse(rawTimestamp);
+    if (parsed == null) return 'just now';
+    final diff = DateTime.now().toUtc().difference(parsed.toUtc());
+    if (diff.inSeconds < 5) return 'just now';
+    if (diff.inSeconds < 60) return '${diff.inSeconds}s ago';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    return '${diff.inHours}h ago';
+  }
+
   // ── Upcoming Stops ─────────────────────────────────────────────────────────
+  // Honest placeholder: the backend doesn't yet expose the stop sequence for a
+  // route or real-time arrivals, so we show a banner instead of pretending.
+  // When Wayne adds /transit/routes/{id}/stops + fixes /transit/arrivals,
+  // swap this out for a real list.
   Widget _buildUpcomingStops() {
     return Container(
       padding: const EdgeInsets.all(18),
@@ -428,11 +597,45 @@ class _RouteDetailScreenState extends State<RouteDetailScreen>
             ],
           ),
           const SizedBox(height: 16),
-          ..._upcomingStops.asMap().entries.map((entry) {
-            final i = entry.key;
-            final stop = entry.value;
-            return _buildStopRow(stop, isLast: i == _upcomingStops.length - 1);
-          }),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEF3C7),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFFDE68A)),
+            ),
+            child: const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('🛠', style: TextStyle(fontSize: 18)),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Live stop schedule coming soon',
+                        style: TextStyle(
+                          color: Color(0xFF92400E),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Route stop sequence + arrival times are on our roadmap. Meanwhile, the map above shows this route\'s live bus positions.',
+                        style: TextStyle(
+                          color: Color(0xFF92400E),
+                          fontSize: 12.5,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -548,18 +751,18 @@ class _FactorChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: _kBg,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _kBorder),
+        border: Border.all(color: const Color(0xFFD1FADF)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(emoji, style: const TextStyle(fontSize: 13)),
-          const SizedBox(width: 5),
-          Text(label, style: const TextStyle(color: _kSubtext, fontSize: 12, fontWeight: FontWeight.w500)),
+          Text(emoji, style: const TextStyle(fontSize: 14)),
+          const SizedBox(width: 6),
+          Text(label, style: const TextStyle(color: Color(0xFF065F46), fontSize: 13, fontWeight: FontWeight.w600)),
         ],
       ),
     );
