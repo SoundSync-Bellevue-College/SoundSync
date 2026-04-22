@@ -7,10 +7,15 @@ This guide explains how to export transit arrivals data from PostgreSQL into for
 ```bash
 cd /home/nngo/SoundSync/transit-poller
 
-# Export today's data
+# Export today's data (append new arrivals, regenerate RAG)
 python3 export_data.py --date 2026-04-22
 
-# Export a specific date
+# Run multiple times throughout the day — only new records are added
+python3 export_data.py --date 2026-04-22   # 9 AM — exports 500 arrivals
+python3 export_data.py --date 2026-04-22   # 1 PM — appends 1500 new arrivals
+python3 export_data.py --date 2026-04-22   # 6 PM — appends 2000 new arrivals
+
+# Export a past date
 python3 export_data.py --date 2026-04-21
 
 # Export yesterday (default)
@@ -19,14 +24,26 @@ python3 export_data.py
 
 ## Output Structure
 
-Each run creates a directory `data/YYYY-MM-DD/` with three files:
+Each day gets a directory `data/YYYY-MM-DD/` with three files that **accumulate throughout the day**:
 
 ```
 data/2026-04-22/
-├── raw.json                    (3.2 MB) — Every individual arrival record
-├── raw.csv                     (1.3 MB) — Same data in tabular CSV form
-└── rag_dataset_2026-04-22.json (100 KB) — Pre-summarized documents for RAG
+├── raw.json                    — Every individual arrival record (appends new ones)
+├── raw.csv                     — Same data in tabular CSV form (updated with appends)
+└── rag_dataset_2026-04-22.json — Pre-summarized documents for RAG (regenerated each run)
 ```
+
+**How files grow throughout the day:**
+- `raw.json` / `raw.csv` — **append-only**
+  - First run (6 AM): 100 records
+  - Second run (9 AM): 500 records (appended 400 new, no duplicates)
+  - Third run (6 PM): 5000 records (appended 4500 new)
+  - Files only grow, never truncate or overwrite
+  
+- `rag_dataset_2026-04-22.json` — **regenerated each run**
+  - Always reflects the complete picture of the calendar day so far
+  - Metrics like `avg_delay` and `on_time_rate` are updated as new data arrives
+  - `doc_id`s are deterministic and stable (deduplication happens at import time)
 
 ## File Formats
 
@@ -146,21 +163,28 @@ for doc in docs:
 
 ## Storing Exports Over Time
 
-To build up a dataset over multiple days:
+**Within a single day:** Run the export multiple times (e.g., every hour). New arrivals are appended to `raw.json` and `raw.csv`; `rag_dataset_2026-04-22.json` is regenerated with updated metrics.
 
 ```bash
-# Script to export all recent data
+# Cron job to export every hour during business hours
+0 6-20 * * * cd /home/nngo/SoundSync/transit-poller && python3 export_data.py
+```
+
+**Across multiple days:** Once a day is complete, its files are permanent. To build a multi-day dataset:
+
+```bash
+# Export the past 30 days
 for day in {1..30}; do
   date=$(python3 -c "from datetime import datetime, timedelta; print((datetime.now() - timedelta(days=$day)).strftime('%Y-%m-%d'))")
   python3 export_data.py --date $date
 done
 
-# See all exports
+# View your data hierarchy
 ls data/
-# data/2026-04-01/  data/2026-04-02/  ... data/2026-04-22/
+# data/2026-03-23/  data/2026-03-24/  ... data/2026-04-22/
 ```
 
-Then concatenate all `rag_dataset_*.json` files for bulk import:
+**For RAG import:** Concatenate all `rag_dataset_*.json` files into a single training dataset:
 
 ```bash
 python3 << 'EOF'
@@ -176,6 +200,7 @@ with open("all_rag_data.json", "w") as f:
     json.dump(all_docs, f, indent=2)
     
 print(f"Combined {len(all_docs)} documents into all_rag_data.json")
+print(f"Ready to import into vector store with stable doc_ids")
 EOF
 ```
 

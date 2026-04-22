@@ -65,6 +65,17 @@ def make_doc_id(*parts):
     raw = "|".join(str(p) for p in parts)
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
+def get_exported_ids(json_path):
+    """Load set of already-exported record IDs from raw.json."""
+    if not os.path.exists(json_path):
+        return set()
+    try:
+        with open(json_path) as f:
+            existing = json.load(f)
+        return {r["id"] for r in existing}
+    except (json.JSONDecodeError, KeyError):
+        return set()
+
 def fetch_arrivals(conn, date):
     """Fetch all arrivals for a given date (YYYY-MM-DD)."""
     cur = conn.cursor()
@@ -83,15 +94,27 @@ def fetch_arrivals(conn, date):
     return rows
 
 def export_raw(conn, date, out_dir):
-    """Export raw arrivals to JSON and CSV."""
+    """Export raw arrivals to JSON and CSV (append-only mode)."""
     rows = fetch_arrivals(conn, date)
-
     os.makedirs(out_dir, exist_ok=True)
 
-    # JSON export
-    records = []
+    json_path = os.path.join(out_dir, "raw.json")
+    csv_path = os.path.join(out_dir, "raw.csv")
+
+    # Load existing records to avoid duplicates
+    existing_ids = get_exported_ids(json_path)
+    existing_records = []
+    if os.path.exists(json_path):
+        try:
+            with open(json_path) as f:
+                existing_records = json.load(f)
+        except (json.JSONDecodeError, ValueError):
+            existing_records = []
+
+    # Build new records from DB rows, filtering out already-exported ones
+    new_records = []
     for row in rows:
-        records.append({
+        record = {
             "id": row[0],
             "stop_id": row[1],
             "route_id": row[2],
@@ -101,23 +124,30 @@ def export_raw(conn, date, out_dir):
             "predicted_arrival": row[6],
             "delay_seconds": row[7],
             "recorded_at": row[8].isoformat(),
-        })
+        }
+        if record["id"] not in existing_ids:
+            new_records.append(record)
 
-    json_path = os.path.join(out_dir, "raw.json")
+    # Combine existing + new
+    all_records = existing_records + new_records
+
+    # JSON export
     with open(json_path, "w") as f:
-        json.dump(records, f, indent=2, default=str)
-    print(f"✓ Exported {len(records)} records to {json_path}")
+        json.dump(all_records, f, indent=2, default=str)
 
-    # CSV export
-    csv_path = os.path.join(out_dir, "raw.csv")
-    if records:
+    new_count = len(new_records)
+    total_count = len(all_records)
+    print(f"✓ Appended {new_count} new records to {json_path} (total: {total_count})")
+
+    # CSV export (rebuild from scratch for consistency)
+    if all_records:
         with open(csv_path, "w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=records[0].keys())
+            writer = csv.DictWriter(f, fieldnames=all_records[0].keys())
             writer.writeheader()
-            writer.writerows(records)
-        print(f"✓ Exported {len(records)} records to {csv_path}")
+            writer.writerows(all_records)
+        print(f"✓ Updated {csv_path} with {total_count} total records")
 
-    return records
+    return all_records
 
 def export_rag(conn, date, out_dir, records=None):
     """Export RAG-ready summaries."""

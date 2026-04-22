@@ -157,6 +157,21 @@ conn.close()
 EOF
 ```
 
+## Exporting Data for RAG
+
+Once you've verified the database is collecting data, use `export_data.py` to export it for RAG:
+
+```bash
+python3 export_data.py --date 2026-04-22
+```
+
+This creates three files in `data/2026-04-22/`:
+- `raw.json` — all individual arrival records (appends throughout the day)
+- `raw.csv` — same data in spreadsheet-friendly format
+- `rag_dataset_2026-04-22.json` — pre-summarized documents ready for vector store import
+
+See **EXPORT_GUIDE.md** for full documentation.
+
 ## Database Schema
 
 The `arrivals` table has these columns:
