@@ -89,32 +89,39 @@ def run():
     init_db()
     print(f"Starting poller. Checking {len(BELLEVUE_STOPS)} stops every 60 seconds...\n")
     while True:
-        timestamp = datetime.now().strftime("%H:%M:%S")
-
         try:
-            conn = get_db()
-        except Exception as e:
-            print(f"[{timestamp}] DB connection failed: {e}. Retrying next cycle.")
-            time.sleep(60)
-            continue
+            timestamp = datetime.now().strftime("%H:%M:%S")
 
-        total = 0
-        for stop_id in BELLEVUE_STOPS:
             try:
-                arrivals = fetch_arrivals(stop_id)
-                saved = store_arrivals(conn, stop_id, arrivals)
-                total += saved
-                print(f"[{timestamp}] Stop {stop_id}: {len(arrivals)} arrivals fetched, {saved} with predictions stored")
+                conn = get_db()
             except Exception as e:
-                print(f"[{timestamp}] ERROR on stop {stop_id}: {e}")
+                print(f"[{timestamp}] DB connection failed: {e}. Retrying next cycle.")
+                time.sleep(60)
+                continue
 
-        try:
-            conn.close()
-        except Exception:
-            pass
+            total = 0
+            for stop_id in BELLEVUE_STOPS:
+                try:
+                    arrivals = fetch_arrivals(stop_id)
+                    saved = store_arrivals(conn, stop_id, arrivals)
+                    total += saved
+                    print(f"[{timestamp}] Stop {stop_id}: {len(arrivals)} arrivals fetched, {saved} with predictions stored")
+                except Exception as e:
+                    print(f"[{timestamp}] ERROR on stop {stop_id}: {e}")
 
-        print(f"  → Total stored this cycle: {total}\n")
-        time.sleep(60)
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+            print(f"  → Total stored this cycle: {total}\n")
+            time.sleep(60)
+
+        except Exception as e:
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            print(f"[{timestamp}] FATAL: Unexpected error in cycle: {e}")
+            print(f"[{timestamp}] Restarting in 60 seconds...")
+            time.sleep(60)
 
 if __name__ == "__main__":
     run()
