@@ -44,15 +44,16 @@ def init_db():
 def fetch_arrivals(stop_id):
     url = f"{BASE_URL}/arrivals-and-departures-for-stop/{stop_id}.json"
     params = {"key": API_KEY, "minutesAfter": 60}
-    response = requests.get(url, params=params)
-    if response.status_code != 200:
-        print(f"Error fetching stop {stop_id}: {response.status_code}")
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        if response.status_code != 200:
+            return []
+        data = response.json()
+        return data.get("data", {}).get("entry", {}).get("arrivalsAndDepartures", [])
+    except requests.RequestException:
         return []
-    data = response.json()
-    return data.get("data", {}).get("entry", {}).get("arrivalsAndDepartures", [])
 
-def store_arrivals(stop_id, arrivals):
-    conn = get_db()
+def store_arrivals(conn, stop_id, arrivals):
     cur = conn.cursor()
     count = 0
     for a in arrivals:
@@ -66,7 +67,7 @@ def store_arrivals(stop_id, arrivals):
         delay_seconds = (predicted - scheduled) // 1000  # convert ms to seconds
 
         cur.execute("""
-            INSERT INTO arrivals 
+            INSERT INTO arrivals
                 (stop_id, route_id, trip_id, headsign, scheduled_arrival, predicted_arrival, delay_seconds)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
         """, (
@@ -82,7 +83,6 @@ def store_arrivals(stop_id, arrivals):
 
     conn.commit()
     cur.close()
-    conn.close()
     return count
 
 def run():
@@ -90,12 +90,29 @@ def run():
     print(f"Starting poller. Checking {len(BELLEVUE_STOPS)} stops every 60 seconds...\n")
     while True:
         timestamp = datetime.now().strftime("%H:%M:%S")
+
+        try:
+            conn = get_db()
+        except Exception as e:
+            print(f"[{timestamp}] DB connection failed: {e}. Retrying next cycle.")
+            time.sleep(60)
+            continue
+
         total = 0
         for stop_id in BELLEVUE_STOPS:
-            arrivals = fetch_arrivals(stop_id)
-            saved = store_arrivals(stop_id, arrivals)
-            total += saved
-            print(f"[{timestamp}] Stop {stop_id}: {len(arrivals)} arrivals fetched, {saved} with predictions stored")
+            try:
+                arrivals = fetch_arrivals(stop_id)
+                saved = store_arrivals(conn, stop_id, arrivals)
+                total += saved
+                print(f"[{timestamp}] Stop {stop_id}: {len(arrivals)} arrivals fetched, {saved} with predictions stored")
+            except Exception as e:
+                print(f"[{timestamp}] ERROR on stop {stop_id}: {e}")
+
+        try:
+            conn.close()
+        except Exception:
+            pass
+
         print(f"  → Total stored this cycle: {total}\n")
         time.sleep(60)
 
