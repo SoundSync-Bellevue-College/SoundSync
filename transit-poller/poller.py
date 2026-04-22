@@ -4,21 +4,12 @@ import time
 import os
 from dotenv import load_dotenv
 from datetime import datetime
+from stops import BELLEVUE_STOPS
 
 load_dotenv()
 
 API_KEY = os.getenv("OBA_API_KEY")
 BASE_URL = "https://api.pugetsound.onebusaway.org/api/where"
-
-TEST_STOPS = [    
-    # Bellevue Transit Center - Route 550
-    "1_67652",  # BTC Bay 9 - 550 to Seattle
-    "1_68007",  # BTC Bay 12 - 550 to Bellevue
-
-    # Kelsey Creek Rd (Bellevue College) - Routes 221, 226, 245, 271
-    "1_72984",  # Northbound toward Bellevue TC
-    "1_72983",  # Southbound toward Eastgate
-]
 
 def get_db():
     return psycopg2.connect(
@@ -96,11 +87,11 @@ def store_arrivals(stop_id, arrivals):
 
 def run():
     init_db()
-    print(f"Starting poller. Checking {len(TEST_STOPS)} stops every 60 seconds...\n")
+    print(f"Starting poller. Checking {len(BELLEVUE_STOPS)} stops every 60 seconds...\n")
     while True:
         timestamp = datetime.now().strftime("%H:%M:%S")
         total = 0
-        for stop_id in TEST_STOPS:
+        for stop_id in BELLEVUE_STOPS:
             arrivals = fetch_arrivals(stop_id)
             saved = store_arrivals(stop_id, arrivals)
             total += saved
