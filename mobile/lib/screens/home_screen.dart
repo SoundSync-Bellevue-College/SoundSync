@@ -12,6 +12,7 @@ import '../services/api_client.dart';
 import '../services/geocoding_service.dart';
 import '../services/route_planning_service.dart';
 import '../services/routes_lookup.dart';
+import '../services/reliability_service.dart';
 import '../widgets/transit_route_sheet.dart';
 import '../widgets/weather_chip.dart';
 import '../widgets/vehicle_marker.dart';
@@ -87,8 +88,12 @@ List<LatLng> _decodePolyline(String encoded) {
 const _seattle = LatLng(47.6062, -122.3321);
 
 // Radius (in miles) used to filter nearby vehicles around the user.
-const double _kNearbyRadiusMiles = 0.5;
-const double _kFollowUserZoom    = 15.0; // ~0.5 mi radius visible on screen
+// If fewer than [_kMinBusesBeforeExpand] buses are found within this radius,
+// the list automatically expands to [_kWideNearbyRadiusMiles].
+const double _kNearbyRadiusMiles     = 0.5;
+const double _kWideNearbyRadiusMiles = 1.0;
+const int    _kMinBusesBeforeExpand  = 2;
+const double _kFollowUserZoom        = 15.0; // ~0.5 mi radius visible on screen
 
 // Simple equirectangular distance in miles (plenty accurate for ~1mi scale)
 double _distanceMiles(double lat1, double lng1, double lat2, double lng2) {
@@ -327,24 +332,49 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _lastVehicles = vehicles;
     final newMarkers = <Marker>{};
 
-    // Nearby filter: only show buses within _kNearbyRadiusMiles of the user.
+    // Nearby filter: only show buses within the wider radius so every bus
+    // shown in the "Buses near you" list also appears as a pill on the map.
     final userPos = ref.read(locationProvider).valueOrNull;
     final double? userLat = userPos?.latitude;
     final double? userLng = userPos?.longitude;
 
+    // Dedupe: backend returns historical snapshots, so keep only the newest
+    // position per vehicle, same logic as the bottom panel.
+    final Map<String, Map<String, dynamic>> newestByVehicleMap = {};
     for (final v in vehicles) {
+      final id = (v['vehicleId'] as String?) ?? '';
+      if (id.isEmpty) continue;
+      final existing = newestByVehicleMap[id];
+      if (existing == null) {
+        newestByVehicleMap[id] = v;
+      } else {
+        final tNew = DateTime.tryParse((v['timestamp'] as String?) ?? '');
+        final tOld = DateTime.tryParse((existing['timestamp'] as String?) ?? '');
+        if (tNew != null && (tOld == null || tNew.isAfter(tOld))) {
+          newestByVehicleMap[id] = v;
+        }
+      }
+    }
+    final nowUtc = DateTime.now().toUtc();
+
+    for (final v in newestByVehicleMap.values) {
       final vehicleId = v['vehicleId'] as String;
       final routeId   = (v['routeId'] as String?) ?? '?';
       final shortName = RoutesLookup.instance.shortName(routeId);
       final lat = (v['lat'] as num).toDouble();
       final lng = (v['lng'] as num).toDouble();
 
-      // Distance filter (only when we have a user position and no active route
-      // override). Active route filter still wins.
+      // Drop stale snapshots older than 10 min — same policy as the list.
+      final ts = DateTime.tryParse((v['timestamp'] as String?) ?? '');
+      if (ts == null || nowUtc.difference(ts.toUtc()).inMinutes >= 10) continue;
+
+      // Distance filter — use the WIDE radius (1mi) to match the bottom list,
+      // so every bus in the list also gets a pill on the map.
+      // Active route filter still wins if user selected a specific route.
       if (_filterToRouteOnly && _activeRouteShortNames.isNotEmpty &&
           !_activeRouteShortNames.contains(shortName)) continue;
       if (!_filterToRouteOnly && userLat != null && userLng != null) {
-        if (_distanceMiles(userLat, userLng, lat, lng) > _kNearbyRadiusMiles) {
+        if (_distanceMiles(userLat, userLng, lat, lng) > _kWideNearbyRadiusMiles) {
           continue;
         }
       }
@@ -807,7 +837,7 @@ class _FloatingChip extends StatelessWidget {
 // Shows buses physically near the user, sorted by distance. The list gives
 // users a clear "what's around me right now" feel, matching the One Bus Away
 // model — no destination guessing, no fake "Leave NOW" prompts.
-class _DefaultBottomPanel extends StatelessWidget {
+class _DefaultBottomPanel extends ConsumerWidget {
   final List<Map<String, dynamic>> vehicles;
   final double? userLat;
   final double? userLng;
@@ -823,10 +853,12 @@ class _DefaultBottomPanel extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     // Build a list of nearby vehicles enriched with distance (miles).
-    // Backend returns multiple historical snapshots per vehicle, so dedupe
-    // by vehicleId keeping only the newest snapshot, and drop stale ones.
+    //
+    // The backend currently returns multiple historical snapshots per vehicle,
+    // so we dedupe by vehicleId, keep only the newest snapshot, and drop
+    // stale ones (>10 min old). This keeps the UI honest about what's *live*.
     final Map<String, Map<String, dynamic>> newestByVehicle = {};
     for (final v in vehicles) {
       final id = (v['vehicleId'] as String?) ?? '';
@@ -849,8 +881,11 @@ class _DefaultBottomPanel extends StatelessWidget {
       final routeId   = (v['routeId']   as String?) ?? '';
       final shortName = RoutesLookup.instance.shortName(routeId);
       if (vehicleId.isEmpty || shortName.isEmpty) continue;
+
+      // Drop stale snapshots
       final ts = DateTime.tryParse((v['timestamp'] as String?) ?? '');
       if (ts == null || now.difference(ts.toUtc()).inMinutes >= 10) continue;
+
       final lat = (v['lat'] as num?)?.toDouble();
       final lng = (v['lng'] as num?)?.toDouble();
       if (lat == null || lng == null) continue;
@@ -858,8 +893,9 @@ class _DefaultBottomPanel extends StatelessWidget {
       final double? dist = (userLat != null && userLng != null)
           ? _distanceMiles(userLat!, userLng!, lat, lng)
           : null;
-      // Skip buses outside the nearby radius so "Buses near you" stays honest.
-      if (dist != null && dist > _kNearbyRadiusMiles) continue;
+      // Use a wider effective radius: we do a first pass at the narrow
+      // radius below and fall back to the wider one if we don't find enough.
+      if (dist != null && dist > _kWideNearbyRadiusMiles) continue;
       nearby.add(_NearbyVehicle(
         vehicleId: vehicleId,
         routeId:   routeId,
@@ -873,6 +909,29 @@ class _DefaultBottomPanel extends StatelessWidget {
       final da = a.distanceMiles ?? double.infinity;
       final db = b.distanceMiles ?? double.infinity;
       return da.compareTo(db);
+    });
+
+    // Decide whether to trim to narrow radius or keep wide radius.
+    // If there are at least [_kMinBusesBeforeExpand] close buses, show only
+    // those. Otherwise keep everything we found inside the wider radius.
+    final withinNarrow = nearby
+        .where((v) => (v.distanceMiles ?? double.infinity) <= _kNearbyRadiusMiles)
+        .toList();
+    final bool _didExpand = withinNarrow.length < _kMinBusesBeforeExpand;
+    final List<_NearbyVehicle> displayList = _didExpand ? nearby : withinNarrow;
+
+    // Watch the reliability summary — used for the network banner at top
+    // and per-route reliability dots next to each bus row. This is updated
+    // by the backend's ML service every minute.
+    final reliabilityAsync = ref.watch(reliabilitySummaryProvider);
+    final Map<String, RouteReliabilitySummary> reliabilityByTail = {};
+    reliabilityAsync.whenData((list) {
+      for (final r in list) {
+        // Backend returns route_id like "1_100001" — match by numeric tail
+        // since /transit/vehicles sometimes omits the agency prefix.
+        final tail = r.routeId.split('_').last;
+        if (tail.isNotEmpty) reliabilityByTail[tail] = r;
+      }
     });
 
     return Container(
@@ -914,15 +973,41 @@ class _DefaultBottomPanel extends StatelessWidget {
                 ),
                 const Spacer(),
                 Text(
-                  '${nearby.length} live',
+                  '${displayList.length} live',
                   style: const TextStyle(color: _kSubtext, fontSize: 12, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
           ),
 
+          // Expansion note — only shown when we had to widen the search
+          if (_didExpand && displayList.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, size: 13, color: _kSubtext),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      'Showing buses within ${_kWideNearbyRadiusMiles.toStringAsFixed(0)} mi (few buses close to you right now)',
+                      style: const TextStyle(color: _kSubtext, fontSize: 11.5, fontStyle: FontStyle.italic),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          // Reliability banner — fleet-wide ML summary, always visible when
+          // data is available. Shows network on-time rate + route count.
+          reliabilityAsync.when(
+            data: (list) => _NetworkReliabilityBanner(summary: list),
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+          ),
+
           // List — empty state OR rows of buses
-          if (nearby.isEmpty)
+          if (displayList.isEmpty)
             const Padding(
               padding: EdgeInsets.fromLTRB(20, 6, 20, 24),
               child: Row(
@@ -942,8 +1027,9 @@ class _DefaultBottomPanel extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
               child: Column(
-                children: nearby.map((v) => _NearbyBusRow(
+                children: displayList.map((v) => _NearbyBusRow(
                   vehicle: v,
+                  reliability: reliabilityByTail[v.routeId.split('_').last],
                   onTap: () => onVehicleTap(v.vehicleId, v.shortName, v.routeId),
                 )).toList(),
               ),
@@ -976,7 +1062,28 @@ class _NearbyVehicle {
 class _NearbyBusRow extends StatelessWidget {
   final _NearbyVehicle vehicle;
   final VoidCallback onTap;
-  const _NearbyBusRow({required this.vehicle, required this.onTap});
+  final RouteReliabilitySummary? reliability;
+  const _NearbyBusRow({
+    required this.vehicle,
+    required this.onTap,
+    this.reliability,
+  });
+
+  // Colour mapping: green >= 70, amber >= 50, red otherwise. Null reliability
+  // means the ML service has no data for this route yet — we hide the chip.
+  Color? get _reliabilityColor {
+    final r = reliability;
+    if (r == null || r.sampleCount == 0) return null;
+    if (r.score >= 70) return _kAccent;               // green
+    if (r.score >= 50) return const Color(0xFFF59E0B); // amber
+    return const Color(0xFFEF4444);                    // red
+  }
+
+  String? get _reliabilityLabel {
+    final r = reliability;
+    if (r == null || r.sampleCount == 0) return null;
+    return '${r.score.round()}%';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -993,6 +1100,9 @@ class _NearbyBusRow extends StatelessWidget {
     // Pill width adapts to short name length so long names like "H Line"
     // or "C Line" don't crowd the text next to them.
     final pillWidth = vehicle.shortName.length > 3 ? 72.0 : 60.0;
+
+    final relColor = _reliabilityColor;
+    final relLabel = _reliabilityLabel;
 
     return InkWell(
       onTap: onTap,
@@ -1024,15 +1134,42 @@ class _NearbyBusRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Route ${vehicle.shortName}',
-                    style: const TextStyle(
-                      color: _kText,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          'Route ${vehicle.shortName}',
+                          style: const TextStyle(
+                            color: _kText,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      // Reliability score chip — ML-derived, shown inline
+                      // with the route title so users see it immediately.
+                      if (relColor != null && relLabel != null) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: relColor.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: relColor.withOpacity(0.35)),
+                          ),
+                          child: Text(
+                            relLabel,
+                            style: TextStyle(
+                              color: relColor,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   if (prettyDescription.isNotEmpty) ...[
                     const SizedBox(height: 3),
@@ -1091,6 +1228,100 @@ class _NearbyBusRow extends StatelessWidget {
               Icons.chevron_right_rounded,
               color: _kSubtext,
               size: 22,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Network Reliability Banner ──────────────────────────────────────────────
+/// Fleet-wide reliability summary shown at the top of the bottom panel.
+/// Uses Nolan's ML service data from `/reliability/summary`. Always visible.
+class _NetworkReliabilityBanner extends StatelessWidget {
+  final List<RouteReliabilitySummary> summary;
+  const _NetworkReliabilityBanner({required this.summary});
+
+  @override
+  Widget build(BuildContext context) {
+    if (summary.isEmpty) return const SizedBox.shrink();
+
+    // Compute network-wide on-time rate weighted by sample count.
+    double weightedOnTimeSum = 0;
+    int totalSamples = 0;
+    int routesWithData = 0;
+    int troubleRoutes = 0;
+    for (final r in summary) {
+      if (r.sampleCount == 0) continue;
+      weightedOnTimeSum += r.onTimeRate * r.sampleCount;
+      totalSamples += r.sampleCount;
+      routesWithData += 1;
+      if (r.score < 50) troubleRoutes += 1;
+    }
+    if (totalSamples == 0) return const SizedBox.shrink();
+
+    final networkOnTime = weightedOnTimeSum / totalSamples;
+
+    // Colour + icon depend on network health.
+    final Color bgColor;
+    final Color fgColor;
+    final String emoji;
+    final String headline;
+    if (networkOnTime >= 80) {
+      bgColor = const Color(0xFFECFDF5); // pale green
+      fgColor = const Color(0xFF065F46);
+      emoji = '🤖';
+      headline = 'Network running smoothly';
+    } else if (networkOnTime >= 65) {
+      bgColor = const Color(0xFFFEF3C7); // pale amber
+      fgColor = const Color(0xFF92400E);
+      emoji = '🤖';
+      headline = 'Some delays on the network';
+    } else {
+      bgColor = const Color(0xFFFEF2F2); // pale red
+      fgColor = const Color(0xFF991B1B);
+      emoji = '⚠️';
+      headline = 'Heavier delays right now';
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: fgColor.withOpacity(0.15)),
+        ),
+        child: Row(
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 18)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    headline,
+                    style: TextStyle(
+                      color: fgColor,
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${networkOnTime.toStringAsFixed(0)}% on-time · $routesWithData routes tracked'
+                    '${troubleRoutes > 0 ? " · $troubleRoutes running late" : ""}',
+                    style: TextStyle(
+                      color: fgColor.withOpacity(0.85),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),

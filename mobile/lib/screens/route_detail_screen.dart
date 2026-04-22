@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/routes_lookup.dart';
 import '../services/api_client.dart';
+import '../services/reliability_service.dart';
 
 // ─── Design Tokens (matches home_screen.dart) ─────────────────────────────────
 const _kPrimary    = Color(0xFF1A56DB);
@@ -14,15 +16,15 @@ const _kSubtext    = Color(0xFF6B7280);
 const _kBorder     = Color(0xFFE5E7EB);
 const _kUrgentText = Color(0xFFD97706);
 
-class RouteDetailScreen extends StatefulWidget {
+class RouteDetailScreen extends ConsumerStatefulWidget {
   final String routeId;
   const RouteDetailScreen({super.key, required this.routeId});
 
   @override
-  State<RouteDetailScreen> createState() => _RouteDetailScreenState();
+  ConsumerState<RouteDetailScreen> createState() => _RouteDetailScreenState();
 }
 
-class _RouteDetailScreenState extends State<RouteDetailScreen>
+class _RouteDetailScreenState extends ConsumerState<RouteDetailScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -212,6 +214,8 @@ class _RouteDetailScreenState extends State<RouteDetailScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildAIPredictionCard(),
+                  const SizedBox(height: 16),
+                  _buildReliabilityCard(),
                   const SizedBox(height: 16),
                   _buildLiveBusPreview(),
                   const SizedBox(height: 16),
@@ -422,6 +426,169 @@ class _RouteDetailScreenState extends State<RouteDetailScreen>
         ],
       ),
     );
+  }
+
+  // ── AI Reliability Card ───────────────────────────────────────────────────
+  // Pulls from the ML service via /reliability/summary, then filters for the
+  // specific route being viewed. Shows the reliability score, on-time rate,
+  // average delay, and sample count — all real ML-computed numbers.
+  Widget _buildReliabilityCard() {
+    final summaryAsync = ref.watch(reliabilitySummaryProvider);
+
+    return summaryAsync.when(
+      loading: () => _buildReliabilityShell(
+        isLoading: true,
+        child: const SizedBox(
+          height: 80,
+          child: Center(
+            child: SizedBox(
+              width: 22, height: 22,
+              child: CircularProgressIndicator(strokeWidth: 2, color: _kPrimary),
+            ),
+          ),
+        ),
+      ),
+      error: (_, __) => _buildReliabilityShell(
+        child: const Padding(
+          padding: EdgeInsets.symmetric(vertical: 16),
+          child: Text(
+            'ML reliability service unavailable right now',
+            style: TextStyle(color: _kSubtext, fontSize: 13),
+          ),
+        ),
+      ),
+      data: (summary) {
+        // Match on the numeric tail so ids like "1_100252" and "100252" both find.
+        final targetTail = _rawRouteId.split('_').last;
+        final match = summary.where(
+          (r) => r.routeId.split('_').last == targetTail,
+        ).toList();
+
+        if (match.isEmpty || match.first.sampleCount == 0) {
+          return _buildReliabilityShell(
+            child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'Not enough data yet to score this route — the ML model needs more observations.',
+                style: TextStyle(color: _kSubtext, fontSize: 13),
+              ),
+            ),
+          );
+        }
+
+        final r = match.first;
+        final Color scoreColor = r.score >= 70
+            ? _kAccent
+            : r.score >= 50
+                ? const Color(0xFFF59E0B)
+                : const Color(0xFFEF4444);
+
+        // Format average delay — only if value is believable (<30 min).
+        String delayStr;
+        if (!r.hasValidDelay) {
+          delayStr = '—';
+        } else if (r.avgDelaySeconds.abs() < 60) {
+          delayStr = '${r.avgDelaySeconds.toStringAsFixed(0)}s';
+        } else {
+          delayStr = '${(r.avgDelaySeconds / 60).toStringAsFixed(1)}m';
+        }
+        final delayIsLate = r.avgDelaySeconds > 0;
+
+        return _buildReliabilityShell(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Score ring + headline
+              Row(
+                children: [
+                  _ScoreRing(score: r.score, color: scoreColor),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          r.statusLabel[0].toUpperCase() + r.statusLabel.substring(1),
+                          style: TextStyle(
+                            color: scoreColor,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Based on ${_formatCount(r.sampleCount)} observations',
+                          style: const TextStyle(
+                            color: _kSubtext,
+                            fontSize: 12.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // Stat row
+              Row(
+                children: [
+                  Expanded(
+                    child: _StatBox(
+                      label: 'On-time rate',
+                      value: '${r.onTimeRate.toStringAsFixed(0)}%',
+                      color: _kAccent,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _StatBox(
+                      label: r.hasValidDelay
+                          ? (delayIsLate ? 'Avg delay' : 'Avg early')
+                          : 'Avg delay',
+                      value: delayStr,
+                      color: delayIsLate ? _kUrgentText : _kAccent,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildReliabilityShell({required Widget child, bool isLoading = false}) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: _kSurface,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: const [BoxShadow(color: Color(0x0F000000), blurRadius: 12, offset: Offset(0, 4))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Text('🤖', style: TextStyle(fontSize: 18)),
+              SizedBox(width: 8),
+              Text(
+                'AI Reliability',
+                style: TextStyle(color: _kText, fontSize: 15, fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          child,
+        ],
+      ),
+    );
+  }
+
+  String _formatCount(int n) {
+    if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}k';
+    return n.toString();
   }
 
   // ── Live Bus Preview ───────────────────────────────────────────────────────
@@ -763,6 +930,113 @@ class _FactorChip extends StatelessWidget {
           Text(emoji, style: const TextStyle(fontSize: 14)),
           const SizedBox(width: 6),
           Text(label, style: const TextStyle(color: Color(0xFF065F46), fontSize: 13, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Helpers for AI Reliability card ────────────────────────────────────────
+
+/// Circular score ring — large coloured arc showing the reliability score out of 100.
+class _ScoreRing extends StatelessWidget {
+  final double score;
+  final Color color;
+  const _ScoreRing({required this.score, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 72, height: 72,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Background ring
+          SizedBox(
+            width: 72, height: 72,
+            child: CircularProgressIndicator(
+              value: 1,
+              strokeWidth: 7,
+              color: color.withOpacity(0.15),
+            ),
+          ),
+          // Actual score ring
+          SizedBox(
+            width: 72, height: 72,
+            child: CircularProgressIndicator(
+              value: (score.clamp(0, 100)) / 100,
+              strokeWidth: 7,
+              color: color,
+              strokeCap: StrokeCap.round,
+            ),
+          ),
+          // Score number in the middle
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                score.toStringAsFixed(0),
+                style: TextStyle(
+                  color: color,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  height: 1,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '/100',
+                style: TextStyle(
+                  color: color.withOpacity(0.7),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Small stat tile — label on top, value big below. Used for on-time rate / avg delay.
+class _StatBox extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  const _StatBox({required this.label, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: _kSubtext,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              height: 1.1,
+            ),
+          ),
         ],
       ),
     );
