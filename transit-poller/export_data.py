@@ -51,6 +51,14 @@ def is_on_time(delay_seconds):
     """On-time if |delay| <= 120 seconds."""
     return abs(delay_seconds) <= 120
 
+def sample_quality(total_records):
+    """Confidence tier based on sample size."""
+    if total_records >= 100:
+        return "high"
+    elif total_records >= 20:
+        return "medium"
+    return "low"
+
 def fetch_arrivals(conn, date):
     """Fetch all arrivals for a given date (YYYY-MM-DD)."""
     cur = conn.cursor()
@@ -147,6 +155,14 @@ def export_rag(conn, date, out_dir, records=None):
             route_timebin_data[key] = []
         route_timebin_data[key].append(rec)
 
+    # Aggregate by (stop, route)
+    stop_route_data = {}
+    for rec in records:
+        key = (rec["stop_id"], rec["route_id"])
+        if key not in stop_route_data:
+            stop_route_data[key] = []
+        stop_route_data[key].append(rec)
+
     rag_docs = []
 
     # Route summaries
@@ -174,6 +190,7 @@ def export_rag(conn, date, out_dir, records=None):
             "headsign": headsign,
             "agency": agency,
             "total_records": total,
+            "sample_quality": sample_quality(total),
             "avg_delay_seconds": round(avg_delay, 2),
             "on_time_rate": round(on_time_rate, 3),
             "pct_early": round(pct_early, 3),
@@ -203,6 +220,7 @@ def export_rag(conn, date, out_dir, records=None):
             "date": str(date),
             "stop_id": stop_id,
             "total_records": total,
+            "sample_quality": sample_quality(total),
             "routes_served": routes,
             "avg_delay_seconds": round(avg_delay, 2),
             "on_time_rate": round(on_time_rate, 3),
@@ -236,11 +254,45 @@ def export_rag(conn, date, out_dir, records=None):
             "route_id": route_id,
             "time_bin": time_bin,
             "total_records": total,
+            "sample_quality": sample_quality(total),
             "avg_delay_seconds": round(avg_delay, 2),
             "on_time_rate": round(on_time_rate, 3),
             "text": (
                 f"On {date} during {time_bin} hours ({time_range}), Route {route_id} recorded {total} arrivals "
                 f"with an average delay of {round(abs(avg_delay))} seconds and a {round(on_time_rate * 100)}% on-time rate."
+            )
+        }
+        rag_docs.append(doc)
+
+    # Stop × route summaries
+    for (stop_id, route_id), arrivals in stop_route_data.items():
+        if not arrivals:
+            continue
+
+        total = len(arrivals)
+        on_time_count = sum(1 for a in arrivals if is_on_time(a["delay_seconds"]))
+        avg_delay = sum(a["delay_seconds"] for a in arrivals) / total
+        on_time_rate = on_time_count / total
+
+        headsign = arrivals[0]["headsign"] or "Unknown"
+        agency = get_agency(route_id)
+
+        doc = {
+            "type": "stop_route_summary",
+            "date": str(date),
+            "stop_id": stop_id,
+            "route_id": route_id,
+            "headsign": headsign,
+            "agency": agency,
+            "total_records": total,
+            "sample_quality": sample_quality(total),
+            "avg_delay_seconds": round(avg_delay, 2),
+            "on_time_rate": round(on_time_rate, 3),
+            "text": (
+                f"On {date}, at stop {stop_id}, Route {route_id} ({headsign}, {agency}) "
+                f"recorded {total} arrivals with an average delay of "
+                f"{round(abs(avg_delay))} seconds {'late' if avg_delay > 0 else 'early'} "
+                f"and a {round(on_time_rate * 100)}% on-time rate."
             )
         }
         rag_docs.append(doc)
