@@ -3,6 +3,7 @@ import json
 import csv
 import os
 import argparse
+import hashlib
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from zoneinfo import ZoneInfo
@@ -58,6 +59,11 @@ def sample_quality(total_records):
     elif total_records >= 20:
         return "medium"
     return "low"
+
+def make_doc_id(*parts):
+    """Create deterministic doc_id from natural key components."""
+    raw = "|".join(str(p) for p in parts)
+    return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 def fetch_arrivals(conn, date):
     """Fetch all arrivals for a given date (YYYY-MM-DD)."""
@@ -184,6 +190,7 @@ def export_rag(conn, date, out_dir, records=None):
         agency = get_agency(route_id)
 
         doc = {
+            "doc_id": make_doc_id("route_summary", date, route_id),
             "type": "route_summary",
             "date": str(date),
             "route_id": route_id,
@@ -216,6 +223,7 @@ def export_rag(conn, date, out_dir, records=None):
         routes = sorted(set(a["route_id"] for a in arrivals))
 
         doc = {
+            "doc_id": make_doc_id("stop_summary", date, stop_id),
             "type": "stop_summary",
             "date": str(date),
             "stop_id": stop_id,
@@ -249,6 +257,7 @@ def export_rag(conn, date, out_dir, records=None):
         }[time_bin]
 
         doc = {
+            "doc_id": make_doc_id("time_bin_summary", date, route_id, time_bin),
             "type": "time_bin_summary",
             "date": str(date),
             "route_id": route_id,
@@ -278,6 +287,7 @@ def export_rag(conn, date, out_dir, records=None):
         agency = get_agency(route_id)
 
         doc = {
+            "doc_id": make_doc_id("stop_route_summary", date, stop_id, route_id),
             "type": "stop_route_summary",
             "date": str(date),
             "stop_id": stop_id,
