@@ -85,7 +85,7 @@ def fetch_arrivals(conn, date):
         SELECT id, stop_id, route_id, trip_id, headsign,
                scheduled_arrival, predicted_arrival, delay_seconds, recorded_at
         FROM arrivals
-        WHERE DATE(recorded_at AT TIME ZONE 'America/Los_Angeles') = %s
+        WHERE DATE(recorded_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Los_Angeles') = %s
         ORDER BY recorded_at ASC
     """
     cur.execute(query, (date,))
