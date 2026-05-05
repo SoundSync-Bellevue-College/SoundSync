@@ -165,6 +165,9 @@ onMounted(async () => {
       ? departureValue * 1000
       : Date.now()
 
+let elapsedMs = 0
+
+
   // Collect walk steps with their computed absolute start time + coordinates
   const walkFetches: Array<{ index: number; lat: number; lng: number; timeMs: number }> = []
 

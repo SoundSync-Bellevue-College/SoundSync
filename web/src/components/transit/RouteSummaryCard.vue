@@ -51,7 +51,9 @@
 
     <!-- Fare if available -->
     <div v-if="result.routes[0]?.fare" class="fare-row">
-      <span>Fare: {{ result.routes[0].fare?.text }}</span>
+      <span>
+        Fare: {{ result.routes[0].fare?.currency }} {{ result.routes[0].fare?.value }}
+      </span>
     </div>
   </div>
 </template>
