@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'providers/auth_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/route_detail_screen.dart';
+import 'screens/trip_assistant_screen.dart';
 import 'screens/account_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
@@ -24,6 +25,10 @@ final _router = GoRouter(
     GoRoute(path: '/account', builder: (_, __) => const AccountScreen()),
     GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
     GoRoute(path: '/register', builder: (_, __) => const RegisterScreen()),
+        GoRoute(
+          path: '/assistant',
+          builder: (context, state) => const TripAssistantScreen(),
+        ),
   ],
 );
 

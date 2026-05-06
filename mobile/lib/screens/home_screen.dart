@@ -541,7 +541,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   _FloatingChip(
                     icon: Icons.chat_bubble_outline_rounded,
                     label: 'Ask',
-                    onTap: () {},
+                    onTap: () => context.push('/assistant'),
                   ),
                   const SizedBox(height: 10),
                   _FloatingChip(

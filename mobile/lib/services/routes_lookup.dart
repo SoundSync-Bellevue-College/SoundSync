@@ -46,6 +46,16 @@ class RoutesLookup {
   /// Returns a human description like "Kinnear - Downtown Seattle", or empty string.
   String description(String routeId) => _descriptionMap[routeId] ?? '';
 
+  /// Reverse lookup: find all route_ids whose short_name matches [shortName]
+  /// (case-insensitive). Useful for going from "128" or "C Line" -> route ids.
+  List<String> routeIdsByShortName(String shortName) {
+    final target = shortName.trim().toLowerCase();
+    return _shortNameMap.entries
+        .where((e) => e.value.trim().toLowerCase() == target)
+        .map((e) => e.key)
+        .toList();
+  }
+
   List<String> _parseCsvLine(String line) {
     final result = <String>[];
     final buf = StringBuffer();
