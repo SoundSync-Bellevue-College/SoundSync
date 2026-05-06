@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/routes_lookup.dart';
 import '../services/api_client.dart';
 import '../services/reliability_service.dart';
+import '../services/arrivals_service.dart';
+import '../providers/location_provider.dart';
 
 // ─── Design Tokens (matches home_screen.dart) ─────────────────────────────────
 const _kPrimary    = Color(0xFF1A56DB);
@@ -219,7 +221,7 @@ class _RouteDetailScreenState extends ConsumerState<RouteDetailScreen>
                   const SizedBox(height: 16),
                   _buildLiveBusPreview(),
                   const SizedBox(height: 16),
-                  _buildUpcomingStops(),
+                  _buildUpcomingArrivals(),
                   const SizedBox(height: 24),
                 ],
               ),
@@ -739,11 +741,298 @@ class _RouteDetailScreenState extends ConsumerState<RouteDetailScreen>
     return '${diff.inHours}h ago';
   }
 
-  // ── Upcoming Stops ─────────────────────────────────────────────────────────
-  // Honest placeholder: the backend doesn't yet expose the stop sequence for a
-  // route or real-time arrivals, so we show a banner instead of pretending.
-  // When Wayne adds /transit/routes/{id}/stops + fixes /transit/arrivals,
-  // swap this out for a real list.
+  // ── Upcoming Arrivals ──────────────────────────────────────────────────────
+  // Real implementation as of Sprint 2. Strategy:
+  //  1. Get user location.
+  //  2. Fetch /transit/stops near the user.
+  //  3. Filter to stops where the `routes` array contains this routeId.
+  //  4. For each matching stop (top 5 by distance), fetch /transit/arrivals.
+  //  5. Filter arrivals to ones for this route, take the next upcoming one.
+  //  6. Render as a timeline with stop name + ETA + on-time status.
+  //
+  // We surface this as "arrivals at stops near you for this route" rather than
+  // an ordered route stop sequence, because the backend doesn't expose the
+  // ordered sequence yet and we don't want to lie about ordering.
+  Widget _buildUpcomingArrivals() {
+    final userPos = ref.watch(locationProvider).valueOrNull;
+    if (userPos == null) {
+      return _buildArrivalsShell(
+        child: const Padding(
+          padding: EdgeInsets.symmetric(vertical: 12),
+          child: Text(
+            'Waiting for your location to find nearby arrivals...',
+            style: TextStyle(color: _kSubtext, fontSize: 13),
+          ),
+        ),
+      );
+    }
+    return FutureBuilder<List<_RouteArrivalRow>>(
+      future: _loadUpcomingArrivals(userPos.latitude, userPos.longitude),
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return _buildArrivalsShell(
+            child: const SizedBox(
+              height: 80,
+              child: Center(
+                child: SizedBox(
+                  width: 22, height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: _kPrimary),
+                ),
+              ),
+            ),
+          );
+        }
+        if (snap.hasError) {
+          return _buildArrivalsShell(
+            child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'Could not load upcoming arrivals right now.',
+                style: TextStyle(color: _kSubtext, fontSize: 13),
+              ),
+            ),
+          );
+        }
+        final rows = snap.data ?? [];
+        if (rows.isEmpty) {
+          return _buildArrivalsShell(
+            child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'No upcoming arrivals on this route at stops near you.',
+                style: TextStyle(color: _kSubtext, fontSize: 13),
+              ),
+            ),
+          );
+        }
+        return _buildArrivalsShell(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var i = 0; i < rows.length; i++)
+                _buildArrivalRow(rows[i], isLast: i == rows.length - 1),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // Wraps an arrivals card body with the standard header + chrome.
+  Widget _buildArrivalsShell({required Widget child}) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: _kSurface,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: const [BoxShadow(color: Color(0x0F000000), blurRadius: 12, offset: Offset(0, 4))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.place_rounded, color: _kPrimary, size: 20),
+              SizedBox(width: 8),
+              Text('Upcoming Arrivals',
+                  style: TextStyle(color: _kText, fontSize: 15, fontWeight: FontWeight.w700)),
+              Spacer(),
+              Text('Nearby stops',
+                  style: TextStyle(color: _kSubtext, fontSize: 11, fontWeight: FontWeight.w500)),
+            ],
+          ),
+          const SizedBox(height: 14),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildArrivalRow(_RouteArrivalRow row, {required bool isLast}) {
+    // Color cues: green = on time, amber = late <5min, red = late >=5min
+    final delayMin = row.delaySeconds ~/ 60;
+    final Color dotColor;
+    final String statusLabel;
+    if (row.delaySeconds.abs() < 60) {
+      dotColor = _kAccent;
+      statusLabel = 'on time';
+    } else if (row.delaySeconds < -60) {
+      dotColor = const Color(0xFFF59E0B);
+      statusLabel = '${(-delayMin).abs()} min early';
+    } else if (row.delaySeconds < 5 * 60) {
+      dotColor = const Color(0xFFF59E0B);
+      statusLabel = '$delayMin min late';
+    } else {
+      dotColor = const Color(0xFFEF4444);
+      statusLabel = '$delayMin min late';
+    }
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: isLast ? 0 : 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Timeline dot + line
+          Column(
+            children: [
+              Container(
+                width: 12, height: 12,
+                decoration: BoxDecoration(
+                  color: dotColor,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: dotColor.withOpacity(0.3), width: 3),
+                ),
+              ),
+              if (!isLast)
+                Container(
+                  width: 2, height: 28,
+                  margin: const EdgeInsets.only(top: 4),
+                  color: _kBorder,
+                ),
+            ],
+          ),
+          const SizedBox(width: 12),
+          // Stop info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  row.stopName,
+                  style: const TextStyle(
+                    color: _kText, fontSize: 14, fontWeight: FontWeight.w700,
+                  ),
+                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${row.distanceMiles.toStringAsFixed(2)} mi away',
+                  style: const TextStyle(color: _kSubtext, fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          // Time + status
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                row.arrivalTimeLabel,
+                style: const TextStyle(
+                  color: _kText, fontSize: 14, fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '${row.etaLabel} · $statusLabel',
+                style: TextStyle(color: dotColor, fontSize: 11, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Loads upcoming arrivals for this route at nearby stops.
+  // Two-stage fetch: stops first, then arrivals per matching stop.
+  Future<List<_RouteArrivalRow>> _loadUpcomingArrivals(
+      double userLat, double userLng) async {
+    final dio = buildApiClient();
+
+    // Match on the numeric tail because the backend sometimes returns
+    // routeIds with the agency prefix and sometimes without.
+    final targetTail = _rawRouteId.split('_').last;
+
+    // 1. Get nearby stops
+    final stopsResp = await dio.get('/transit/stops',
+        queryParameters: {'lat': userLat, 'lng': userLng});
+    final allStops = (stopsResp.data['stops'] as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .toList();
+
+    // 2. Filter to stops whose `routes` array contains this routeId
+    final matchingStops = allStops.where((s) {
+      final routes = (s['routes'] as List<dynamic>? ?? []);
+      return routes.any((r) =>
+          (r as String?)?.split('_').last == targetTail);
+    }).toList();
+
+    // Compute distance to each matching stop and sort
+    matchingStops.sort((a, b) {
+      final aLat = (a['lat'] as num).toDouble();
+      final aLng = (a['lng'] as num).toDouble();
+      final bLat = (b['lat'] as num).toDouble();
+      final bLng = (b['lng'] as num).toDouble();
+      final aDist = _stopDistance(userLat, userLng, aLat, aLng);
+      final bDist = _stopDistance(userLat, userLng, bLat, bLng);
+      return aDist.compareTo(bDist);
+    });
+
+    // Take top 5 closest
+    final topStops = matchingStops.take(5).toList();
+
+    // 3. For each, fetch arrivals + filter
+    final List<_RouteArrivalRow> rows = [];
+    for (final s in topStops) {
+      final stopId = s['stopId'] as String;
+      final stopName = (s['name'] as String?) ?? stopId;
+      final stopLat = (s['lat'] as num).toDouble();
+      final stopLng = (s['lng'] as num).toDouble();
+      final dist = _stopDistance(userLat, userLng, stopLat, stopLng);
+
+      try {
+        final arrResp = await dio.get('/transit/arrivals',
+            queryParameters: {'stopId': stopId});
+        final arrivals = (arrResp.data['arrivals'] as List<dynamic>? ?? [])
+            .whereType<Map<String, dynamic>>()
+            .where((a) =>
+                ((a['routeId'] as String?) ?? '').split('_').last == targetTail)
+            .toList();
+
+        if (arrivals.isEmpty) continue;
+
+        // Take the next one (already in time order from backend)
+        final next = arrivals.first;
+        final scheduled = DateTime.tryParse(
+            (next['scheduledArrival'] as String?) ?? '')?.toUtc();
+        final estimated = DateTime.tryParse(
+            (next['estimatedArrival'] as String?) ?? '')?.toUtc();
+        if (scheduled == null) continue;
+
+        final t = (estimated ?? scheduled);
+        final mins = t.difference(DateTime.now().toUtc()).inMinutes;
+        if (mins < -2 || mins > 60) continue; // skip past or far-future
+
+        rows.add(_RouteArrivalRow(
+          stopName: stopName,
+          stopId: stopId,
+          distanceMiles: dist,
+          scheduledArrival: scheduled,
+          estimatedArrival: estimated,
+          delaySeconds: (next['delaySeconds'] as num? ?? 0).toInt(),
+          status: (next['status'] as String?) ?? '',
+        ));
+      } catch (_) {
+        // Skip stops with errors
+        continue;
+      }
+    }
+
+    rows.sort((a, b) =>
+        (a.estimatedArrival ?? a.scheduledArrival)
+            .compareTo(b.estimatedArrival ?? b.scheduledArrival));
+    return rows;
+  }
+
+  double _stopDistance(double lat1, double lng1, double lat2, double lng2) {
+    const milesPerLat = 69.0;
+    final dLat = (lat2 - lat1) * milesPerLat;
+    final dLng = (lng2 - lng1) * milesPerLat * 0.74; // approx cos(47°)
+    return (dLat * dLat + dLng * dLng);
+  }
+
+  // ── Upcoming Stops (deprecated — replaced by _buildUpcomingArrivals) ──────
   Widget _buildUpcomingStops() {
     return Container(
       padding: const EdgeInsets.all(18),
@@ -1040,5 +1329,41 @@ class _StatBox extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _RouteArrivalRow {
+  final String stopName;
+  final String stopId;
+  final double distanceMiles;
+  final DateTime scheduledArrival;
+  final DateTime? estimatedArrival;
+  final int delaySeconds;
+  final String status;
+
+  const _RouteArrivalRow({
+    required this.stopName,
+    required this.stopId,
+    required this.distanceMiles,
+    required this.scheduledArrival,
+    required this.estimatedArrival,
+    required this.delaySeconds,
+    required this.status,
+  });
+
+  String get arrivalTimeLabel {
+    final t = (estimatedArrival ?? scheduledArrival).toLocal();
+    final hour = t.hour > 12 ? t.hour - 12 : (t.hour == 0 ? 12 : t.hour);
+    final minute = t.minute.toString().padLeft(2, '0');
+    final ampm = t.hour >= 12 ? 'PM' : 'AM';
+    return '$hour:$minute $ampm';
+  }
+
+  String get etaLabel {
+    final t = (estimatedArrival ?? scheduledArrival);
+    final mins = t.difference(DateTime.now().toUtc()).inMinutes;
+    if (mins <= 0) return 'now';
+    if (mins == 1) return 'in 1 min';
+    return 'in $mins min';
   }
 }
