@@ -15,6 +15,11 @@ export const useMapStore = defineStore('map', () => {
   const isLoading = ref(false)
   const error = ref<string | null>(null)
   const showOnlyPlanned = ref(false)
+  const vehicleTypeFilter = ref<'ALL' | 'BUS' | 'RAIL'>('ALL')
+  const mapTypeId = ref<'roadmap' | 'satellite' | 'hybrid' | 'terrain'>('roadmap')
+  const showTransitLayer = ref(false)
+  const showTrafficLayer = ref(false)
+  const showBikingLayer = ref(false)
 
   let pollTimer: ReturnType<typeof setInterval> | null = null
 
@@ -74,6 +79,11 @@ export const useMapStore = defineStore('map', () => {
     isLoading,
     error,
     showOnlyPlanned,
+    vehicleTypeFilter,
+    mapTypeId,
+    showTransitLayer,
+    showTrafficLayer,
+    showBikingLayer,
     fetchVehicles,
     fetchNearbyStops,
     startPolling,

@@ -14,9 +14,10 @@ type Config struct {
 	MongoDB        string
 	JWTSecret      string
 	GoogleMapsKey  string
-	GTFSVehicleURL string
-	GTFSTripURL    string
-	GTFSAlertURL   string
+	GTFSVehicleURL     string
+	GTFSRailVehicleURL string
+	GTFSTripURL        string
+	GTFSAlertURL       string
 	OBABaseURL     string
 	OBAApiKey      string
 	// PostgreSQL — transit poller arrivals database
@@ -44,7 +45,9 @@ func Load() *Config {
 		MongoDB:   getEnv("MONGO_DB", "soundsync"),
 		JWTSecret: getEnv("JWT_SECRET", "change_me_in_production"),
 		GoogleMapsKey: getEnv("GOOGLE_MAPS_API_KEY", ""),
-		GTFSVehicleURL: getEnv("GTFS_VEHICLE_POSITIONS_URL", ""), // deprecated KCM S3 feed; set to override
+		GTFSVehicleURL: getEnv("GTFS_VEHICLE_POSITIONS_URL", ""), // KCM bus feed; set to override
+		GTFSRailVehicleURL: getEnv("GTFS_RAIL_VEHICLE_POSITIONS_URL",
+			"https://s3.amazonaws.com/gtfs.soundtransit.org/VehiclePositions_enhanced.pb"),
 		GTFSTripURL: getEnv("GTFS_TRIP_UPDATES_URL",
 			"https://s3.amazonaws.com/gtfs.soundtransit.org/TripUpdate_enhanced.pb"),
 		GTFSAlertURL: getEnv("GTFS_SERVICE_ALERTS_URL",

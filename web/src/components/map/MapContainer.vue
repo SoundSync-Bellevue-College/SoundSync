@@ -3,22 +3,63 @@
     <div ref="mapEl" class="map-canvas" />
     <LoadingSpinner v-if="!mapReady" overlay label="Loading map…" />
 
-    <!-- Vehicle filter overlay -->
+    <!-- Map controls overlay -->
     <div class="map-overlay">
+
+      <!-- Map type -->
+      <div class="overlay-section-label">Map type</div>
+      <div class="map-type-grid">
+        <button
+          v-for="t in mapTypes"
+          :key="t.id"
+          class="map-type-btn"
+          :class="{ active: mapStore.mapTypeId === t.id }"
+          @click="mapStore.mapTypeId = t.id"
+        >
+          <span class="map-type-icon">{{ t.icon }}</span>
+          <span>{{ t.label }}</span>
+        </button>
+      </div>
+
+      <div class="overlay-divider" />
+
+      <!-- Layers -->
+      <div class="overlay-section-label">Layers</div>
       <label class="overlay-option">
-        <input
-          type="radio"
-          name="vehicle-filter"
-          :value="false"
-          v-model="mapStore.showOnlyPlanned"
-        />
-        All buses
+        <input type="checkbox" v-model="mapStore.showTransitLayer" />
+        Transit
       </label>
+      <label class="overlay-option">
+        <input type="checkbox" v-model="mapStore.showTrafficLayer" />
+        Traffic
+      </label>
+      <label class="overlay-option">
+        <input type="checkbox" v-model="mapStore.showBikingLayer" />
+        Biking
+      </label>
+
+      <div class="overlay-divider" />
+
+      <!-- Vehicle filter -->
+      <div class="overlay-section-label">Vehicles</div>
+      <label class="overlay-option">
+        <input type="radio" name="vehicle-type" value="ALL" v-model="mapStore.vehicleTypeFilter" />
+        All
+      </label>
+      <label class="overlay-option">
+        <input type="radio" name="vehicle-type" value="BUS" v-model="mapStore.vehicleTypeFilter" />
+        Bus only
+      </label>
+      <label class="overlay-option">
+        <input type="radio" name="vehicle-type" value="RAIL" v-model="mapStore.vehicleTypeFilter" />
+        Rail only
+      </label>
+
+      <div class="overlay-divider" />
+
       <label class="overlay-option" :class="{ disabled: !routeStore.directionsResult }">
         <input
-          type="radio"
-          name="vehicle-filter"
-          :value="true"
+          type="checkbox"
           :disabled="!routeStore.directionsResult"
           v-model="mapStore.showOnlyPlanned"
         />
@@ -72,6 +113,16 @@ const mapStore = useMapStore()
 const routeStore = useRouteStore()
 
 const reportVehicle = ref<VehiclePosition | null>(null)
+let transitLayer: google.maps.TransitLayer | null = null
+let trafficLayer: google.maps.TrafficLayer | null = null
+let bikingLayer: google.maps.BicyclingLayer | null = null
+
+const mapTypes = [
+  { id: 'roadmap'   as const, label: 'Default',   icon: '🗺️' },
+  { id: 'satellite' as const, label: 'Satellite',  icon: '🛰️' },
+  { id: 'hybrid'    as const, label: 'Hybrid',     icon: '🌍' },
+  { id: 'terrain'   as const, label: 'Terrain',    icon: '⛰️' },
+]
 
 function onVehicleClick(vehicle: VehiclePosition) {
   mapStore.selectVehicle(vehicle.vehicleId)
@@ -103,6 +154,10 @@ onMounted(async () => {
     streetViewControl: false,
     fullscreenControl: false,
   })
+
+  transitLayer = new google.maps.TransitLayer()
+  trafficLayer = new google.maps.TrafficLayer()
+  bikingLayer = new google.maps.BicyclingLayer()
 
   directionsRenderer = new google.maps.DirectionsRenderer({
     suppressMarkers: false,
@@ -145,6 +200,31 @@ watch(
 )
 
 watch(
+  () => mapStore.showTransitLayer,
+  (show) => transitLayer?.setMap(show ? map.value : null),
+)
+
+watch(
+  () => mapStore.showTrafficLayer,
+  (show) => trafficLayer?.setMap(show ? map.value : null),
+)
+
+watch(
+  () => mapStore.showBikingLayer,
+  (show) => bikingLayer?.setMap(show ? map.value : null),
+)
+
+watch(
+  () => mapStore.mapTypeId,
+  (typeId) => {
+    if (!map.value) return
+    map.value.setMapTypeId(typeId)
+    // Custom dark styles only apply on roadmap; clear them for other types
+    map.value.setOptions({ styles: typeId === 'roadmap' ? darkMapStyles : [] })
+  },
+)
+
+watch(
   () => routeStore.directionsResult,
   (result) => {
     // When plan is cleared, revert to show all
@@ -181,14 +261,26 @@ const plannedShortNames = computed<Set<string>>(() => {
 
 // Vehicles to render on the map
 const displayedVehicles = computed(() => {
-  const vehicles = mapStore.vehicles ?? []
-  if (!mapStore.showOnlyPlanned || plannedShortNames.value.size === 0) {
-    return vehicles
+  let vehicles = mapStore.vehicles ?? []
+
+  // Filter by vehicle type
+  if (mapStore.vehicleTypeFilter !== 'ALL') {
+    vehicles = vehicles.filter((v) => {
+      const type = v.routeType ?? 'BUS'
+      if (mapStore.vehicleTypeFilter === 'RAIL') return type === 'RAIL' || type === 'STREETCAR'
+      return type === 'BUS' || type === 'FERRY'
+    })
   }
-  return vehicles.filter((v) => {
-    const shortName = routeMap.value.get(v.routeId)
-    return shortName !== undefined && plannedShortNames.value.has(shortName)
-  })
+
+  // Filter to planned trip vehicles only
+  if (mapStore.showOnlyPlanned && plannedShortNames.value.size > 0) {
+    vehicles = vehicles.filter((v) => {
+      const shortName = routeMap.value.get(v.routeId)
+      return shortName !== undefined && plannedShortNames.value.has(shortName)
+    })
+  }
+
+  return vehicles
 })
 
 const darkMapStyles: google.maps.MapTypeStyle[] = [
@@ -230,6 +322,58 @@ const darkMapStyles: google.maps.MapTypeStyle[] = [
   backdrop-filter: blur(4px);
 }
 
+.overlay-section-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.1rem;
+}
+
+.map-type-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.3rem;
+}
+
+.map-type-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.35rem 0.4rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #94a3b8;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.map-type-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+}
+
+.map-type-btn.active {
+  background: rgba(59, 130, 246, 0.25);
+  border-color: #3b82f6;
+  color: #93c5fd;
+}
+
+.map-type-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.overlay-divider {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin: 0.3rem 0;
+}
+
 .overlay-option {
   display: flex;
   align-items: center;
@@ -246,14 +390,16 @@ const darkMapStyles: google.maps.MapTypeStyle[] = [
   cursor: not-allowed;
 }
 
-.overlay-option input[type='radio'] {
+.overlay-option input[type='radio'],
+.overlay-option input[type='checkbox'] {
   accent-color: #3b82f6;
   width: 14px;
   height: 14px;
   cursor: pointer;
 }
 
-.overlay-option.disabled input[type='radio'] {
+.overlay-option.disabled input[type='radio'],
+.overlay-option.disabled input[type='checkbox'] {
   cursor: not-allowed;
 }
 
