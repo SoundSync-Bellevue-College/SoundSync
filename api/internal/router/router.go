@@ -44,6 +44,7 @@ func New(cfg *config.Config, db *mongo.Database, pgDB *sql.DB) http.Handler {
 	routeSvc := services.NewRouteService(cfg)
 	weatherSvc := services.NewWeatherService(cfg)
 	reliabilitySvc := services.NewReliabilityService(pgDB)
+	serviceAlertsSvc := services.NewServiceAlertsService(pgDB)
 
 	// Handlers
 	authH := handlers.NewAuthHandler(authSvc)
@@ -54,6 +55,7 @@ func New(cfg *config.Config, db *mongo.Database, pgDB *sql.DB) http.Handler {
 	notifH := handlers.NewNotificationHandler(notifRepo)
 	vehicleReportH := handlers.NewVehicleReportHandler(vehicleReportRepo)
 	reliabilityH := handlers.NewReliabilityHandler(reliabilitySvc)
+	serviceAlertsH := handlers.NewServiceAlertsHandler(serviceAlertsSvc)
 
 	// JWT middleware factory
 	jwtAuth := middleware.NewJWTAuth(cfg.JWTSecret)
@@ -79,6 +81,9 @@ func New(cfg *config.Config, db *mongo.Database, pgDB *sql.DB) http.Handler {
 		// Weather (public)
 		r.Get("/weather", weatherH.GetWeather)
 		r.Get("/weather/hourly", weatherH.GetHourlyForecast)
+
+		// Service alerts (public)
+		r.Get("/service-alerts", serviceAlertsH.GetAlerts)
 
 		// Reliability & prediction (public) — register /summary before /{stopId}
 		r.Get("/reliability/summary", reliabilityH.GetSummary)
