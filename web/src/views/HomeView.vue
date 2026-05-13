@@ -15,6 +15,7 @@
           <span class="stop-name">{{ mapStore.selectedStop.name }}</span>
           <button class="stop-close" @click="mapStore.selectStop(null)">✕</button>
         </div>
+        <StopAlertBanner :alerts="stopAlerts" />
         <ArrivalBoard
           :stop-id="mapStore.selectedStop.stopId"
           :stop-name="mapStore.selectedStop.name"
@@ -30,14 +31,26 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import MapContainer from '@/components/map/MapContainer.vue'
 import RouteSearchPanel from '@/components/transit/RouteSearchPanel.vue'
 import RouteTrackPanel from '@/components/transit/RouteTrackPanel.vue'
 import WeatherWidget from '@/components/weather/WeatherWidget.vue'
 import ArrivalBoard from '@/components/transit/ArrivalBoard.vue'
+import StopAlertBanner from '@/components/transit/StopAlertBanner.vue'
 import { useMapStore } from '@/stores/mapStore'
+import { useServiceAlertStore } from '@/stores/serviceAlertStore'
 
 const mapStore = useMapStore()
+const serviceAlertStore = useServiceAlertStore()
+
+const stopAlerts = computed(() => {
+  if (!mapStore.selectedStop) return []
+  return serviceAlertStore.getAlertsForStop(
+    mapStore.selectedStop.stopId,
+    mapStore.selectedStop.routes,
+  )
+})
 </script>
 
 <style scoped>

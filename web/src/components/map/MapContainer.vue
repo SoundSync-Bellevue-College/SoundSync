@@ -100,6 +100,7 @@
       :key="stop.stopId"
       :stop="stop"
       :map="map"
+      :has-alert="stopsWithAlerts.has(stop.stopId)"
       @click="onStopClick(stop)"
     />
 
@@ -123,6 +124,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useMapStore } from '@/stores/mapStore'
 import { useRouteStore } from '@/stores/routeStore'
+import { useServiceAlertStore } from '@/stores/serviceAlertStore'
 import { loadGoogleMaps, decodePolyline } from '@/services/mapsService'
 import { getRouteLookup } from '@/services/routeLookup'
 import api from '@/services/api'
@@ -137,6 +139,7 @@ const mapReady = ref(false)
 const map = ref<google.maps.Map | null>(null)
 const mapStore = useMapStore()
 const routeStore = useRouteStore()
+const serviceAlertStore = useServiceAlertStore()
 
 const reportVehicle = ref<VehiclePosition | null>(null)
 const showLegend = ref(false)
@@ -439,6 +442,18 @@ watch(
     if (bounds && map.value) map.value.fitBounds(bounds)
   },
 )
+
+// Compute which stops have alerts
+const stopsWithAlerts = computed<Set<string>>(() => {
+  const alertStops = new Set<string>()
+  for (const stop of mapStore.nearbyStops) {
+    const relevantAlerts = serviceAlertStore.getAlertsForStop(stop.stopId, stop.routes)
+    if (relevantAlerts.length > 0) {
+      alertStops.add(stop.stopId)
+    }
+  }
+  return alertStops
+})
 
 // Extract short names of transit lines in the planned trip
 const plannedShortNames = computed<Set<string>>(() => {

@@ -14,6 +14,9 @@
     </nav>
 
     <div class="header-actions">
+      <!-- Service Alert Dropdown (visible to all users) -->
+      <ServiceAlertDropdown />
+
       <template v-if="auth.isLoggedIn">
         <!-- Bell button -->
         <div class="bell-wrapper" ref="bellWrapper">
@@ -72,6 +75,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '@/stores/authStore'
 import { useNotificationStore } from '@/stores/notificationStore'
 import { useRouter } from 'vue-router'
+import ServiceAlertDropdown from './ServiceAlertDropdown.vue'
 
 const auth = useAuthStore()
 const notif = useNotificationStore()
