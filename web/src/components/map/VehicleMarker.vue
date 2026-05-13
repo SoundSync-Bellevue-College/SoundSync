@@ -16,8 +16,9 @@ const props = defineProps<{
 const emit = defineEmits<{ click: [vehicle: VehiclePosition] }>()
 
 let marker: google.maps.Marker | null = null
+let alive = true // guards against ghost markers when unmounted during async icon build
 
-function buildIcon(label: string, color: string, textColor: string, bearing: number): google.maps.Icon {
+function buildBusIcon(label: string, color: string, textColor: string, bearing: number): google.maps.Icon {
   const charWidth = 8
   const padX = 10
   const badgeW = Math.max(36, label.length * charWidth + padX * 2)
@@ -45,18 +46,105 @@ function buildIcon(label: string, color: string, textColor: string, bearing: num
   }
 }
 
+function buildRailIcon(label: string, color: string, textColor: string): google.maps.Icon {
+  const charWidth = 8
+  const padX = 12
+  const badgeW = Math.max(44, label.length * charWidth + padX * 2)
+  const badgeH = 26
+  const cx = badgeW / 2
+  const cy = badgeH / 2
+
+  // Diamond shape around the label
+  const svg = [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${badgeW}" height="${badgeH}">`,
+    `<polygon points="${cx},2 ${badgeW - 2},${cy} ${cx},${badgeH - 2} 2,${cy}"`,
+    ` fill="${color}" stroke="white" stroke-width="2"/>`,
+    `<text x="${cx}" y="${cy + 1}" font-family="Arial,sans-serif"`,
+    ` font-size="10" font-weight="bold" fill="${textColor}"`,
+    ` text-anchor="middle" dominant-baseline="middle">${label}</text>`,
+    `</svg>`,
+  ].join('')
+
+  return {
+    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+    anchor: new google.maps.Point(cx, cy),
+    scaledSize: new google.maps.Size(badgeW, badgeH),
+  }
+}
+
+function buildFerryIcon(label: string, color: string, textColor: string): google.maps.Icon {
+  const charWidth = 8
+  const padX = 10
+  const badgeW = Math.max(40, label.length * charWidth + padX * 2)
+  const badgeH = 24
+  const cx = badgeW / 2
+
+  // Rounded pill shape
+  const svg = [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${badgeW}" height="${badgeH}">`,
+    `<rect x="1" y="1" width="${badgeW - 2}" height="${badgeH - 2}" rx="12"`,
+    ` fill="${color}" stroke="white" stroke-width="2"/>`,
+    `<text x="${cx}" y="${badgeH / 2 + 1}" font-family="Arial,sans-serif"`,
+    ` font-size="10" font-weight="bold" fill="${textColor}"`,
+    ` text-anchor="middle" dominant-baseline="middle">${label}</text>`,
+    `</svg>`,
+  ].join('')
+
+  return {
+    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+    anchor: new google.maps.Point(cx, badgeH / 2),
+    scaledSize: new google.maps.Size(badgeW, badgeH),
+  }
+}
+
+// Returns a short vehicle suffix for differentiating buses on the same route.
+// Uses the last 3 characters of the vehicleId (e.g. "9301" → "301", "L101" → "101").
+function vehicleSuffix(vehicleId: string): string {
+  const id = vehicleId.replace(/\D/g, '') // digits only
+  return id.length > 0 ? id.slice(-3) : vehicleId.slice(-3)
+}
+
+// Fallback colors per GTFS route_type when the route has no custom color
+const TYPE_COLORS: Record<number, { bg: string; text: string }> = {
+  0: { bg: '#22c55e', text: '#ffffff' }, // Tram / Light Rail — green
+  1: { bg: '#a855f7', text: '#ffffff' }, // Subway           — purple
+  2: { bg: '#f59e0b', text: '#ffffff' }, // Rail / Train     — amber
+  3: { bg: '#f97316', text: '#ffffff' }, // Bus              — orange
+  4: { bg: '#0ea5e9', text: '#ffffff' }, // Ferry            — cyan
+}
+
 async function makeIcon(vehicle: VehiclePosition): Promise<google.maps.Icon> {
   const lookup = await getRouteLookup()
   const info = lookup.get(vehicle.routeId)
-  const label = info?.shortName ?? vehicle.routeId
-  const color = info?.color ?? '#3b82f6'
-  const textColor = info?.textColor ?? '#ffffff'
-  return buildIcon(label, color, textColor, vehicle.bearing ?? 0)
+
+  // WSF ferries: vehicleId is "wsf-{VesselName}" — show the vessel name directly
+  const isWSF = vehicle.vehicleId.startsWith('wsf-')
+  const label = isWSF
+    ? vehicle.vehicleId.replace('wsf-', '')
+    : `${info?.shortName ?? vehicle.routeId}·${vehicleSuffix(vehicle.vehicleId)}`
+
+  const gtfsType = info?.routeType ?? 3
+  const fallback = TYPE_COLORS[gtfsType] ?? TYPE_COLORS[3]
+  const color     = info?.color     ?? fallback.bg
+  const textColor = info?.textColor ?? fallback.text
+
+  // Tram (0), Subway (1), Rail (2), or STREETCAR string → diamond rail icon
+  const routeType = vehicle.routeType ?? (gtfsType <= 2 ? 'RAIL' : 'BUS')
+  if (routeType === 'RAIL' || routeType === 'STREETCAR') {
+    return buildRailIcon(label, color, textColor)
+  }
+
+  if (routeType === 'FERRY' || gtfsType === 4) {
+    return buildFerryIcon(label, color, textColor)
+  }
+
+  return buildBusIcon(label, color, textColor, vehicle.bearing ?? 0)
 }
 
 onMounted(async () => {
   if (!props.map) return
   const icon = await makeIcon(props.vehicle)
+  if (!alive) return // unmounted while icon was loading — skip creating the marker
   marker = new google.maps.Marker({
     position: { lat: props.vehicle.lat, lng: props.vehicle.lng },
     map: props.map,
@@ -67,6 +155,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  alive = false
   marker?.setMap(null)
   marker = null
 })
@@ -75,7 +164,8 @@ watch(
   () => props.vehicle,
   async (v) => {
     marker?.setPosition({ lat: v.lat, lng: v.lng })
-    marker?.setIcon(await makeIcon(v))
+    const icon = await makeIcon(v)
+    if (alive) marker?.setIcon(icon)
   },
   { deep: true },
 )

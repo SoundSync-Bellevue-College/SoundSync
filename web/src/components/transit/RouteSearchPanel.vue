@@ -98,6 +98,27 @@
       </label>
     </div>
 
+    <!-- Transit options -->
+    <div class="transit-options">
+      <div class="options-row">
+        <div class="options-col">
+          <div class="options-label">Prefer</div>
+          <label class="option-item" v-for="mode in transitModes" :key="mode.value">
+            <input type="checkbox" :value="mode.value" v-model="selectedModes" />
+            <span>{{ mode.label }}</span>
+          </label>
+        </div>
+        <div class="options-divider" />
+        <div class="options-col">
+          <div class="options-label">Routes</div>
+          <label class="option-item" v-for="pref in routePreferences" :key="pref.value">
+            <input type="radio" name="route-pref" :value="pref.value" v-model="selectedPreference" />
+            <span>{{ pref.label }}</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
     <button class="btn-plan" :disabled="isPlanning" @click="planRoute">
       <span v-if="isPlanning">Planning…</span>
       <span v-else>Get Directions</span>
@@ -165,6 +186,24 @@ const selectedAmPm   = ref<'AM' | 'PM'>(initAmPm)
 
 const hours   = Array.from({ length: 12 }, (_, i) => String(i + 1))
 const minutes = ['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55']
+
+// ── Transit mode & route preference options ───────────────────────────────────
+
+const transitModes = [
+  { label: 'Bus',              value: 'BUS'    },
+  { label: 'Subway',           value: 'SUBWAY' },
+  { label: 'Train',            value: 'TRAIN'  },
+  { label: 'Tram & light rail',value: 'TRAM'   },
+]
+const selectedModes = ref(['BUS', 'SUBWAY', 'TRAIN', 'TRAM'])
+
+const routePreferences = [
+  { label: 'Best route',           value: 'BEST'             },
+  { label: 'Fewer transfers',      value: 'FEWER_TRANSFERS'  },
+  { label: 'Less walking',         value: 'LESS_WALKING'     },
+  { label: 'Wheelchair accessible',value: 'WHEELCHAIR'       },
+]
+const selectedPreference = ref('BEST')
 
 const dateInputEl = ref<HTMLInputElement | null>(null)
 
@@ -271,9 +310,26 @@ function planRoute() {
   routeStore.clearPlan()
 
   const transitTime = buildTransitTime()
+
+  const modeMap: Record<string, google.maps.TransitMode> = {
+    BUS:    google.maps.TransitMode.BUS,
+    SUBWAY: google.maps.TransitMode.SUBWAY,
+    TRAIN:  google.maps.TransitMode.TRAIN,
+    TRAM:   google.maps.TransitMode.TRAM,
+  }
+  const prefMap: Record<string, google.maps.TransitRoutePreference | undefined> = {
+    BEST:             undefined,
+    FEWER_TRANSFERS:  google.maps.TransitRoutePreference.FEWER_TRANSFERS,
+    LESS_WALKING:     google.maps.TransitRoutePreference.LESS_WALKING,
+    WHEELCHAIR:       undefined,
+  }
+
+  const modes = selectedModes.value.map(m => modeMap[m]).filter(Boolean) as google.maps.TransitMode[]
+  const routingPreference = prefMap[selectedPreference.value]
+
   const transitOptions: google.maps.TransitOptions = {
-    modes: [google.maps.TransitMode.BUS, google.maps.TransitMode.RAIL],
-    routingPreference: google.maps.TransitRoutePreference.FEWER_TRANSFERS,
+    ...(modes.length ? { modes } : {}),
+    ...(routingPreference !== undefined ? { routingPreference } : {}),
     ...(timeType.value === 'depart'
       ? { departureTime: transitTime }
       : { arrivalTime: transitTime }),
@@ -286,6 +342,7 @@ function planRoute() {
       destination: destPlace.geometry.location,
       travelMode: google.maps.TravelMode.TRANSIT,
       transitOptions,
+      provideRouteAlternatives: true,
       unitSystem: auth.distanceUnit === 'km'
         ? google.maps.UnitSystem.METRIC
         : google.maps.UnitSystem.IMPERIAL,
@@ -574,5 +631,60 @@ function planRoute() {
 .error-msg {
   font-size: 0.8rem;
   color: var(--color-danger);
+}
+
+/* ── Transit options ─────────────────────────────────────────────────────── */
+
+.transit-options {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.75rem;
+}
+
+.options-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.options-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  flex: 1;
+}
+
+.options-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.1rem;
+}
+
+.options-divider {
+  width: 1px;
+  background: var(--color-border);
+  margin: 0 0.25rem;
+}
+
+.option-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--color-text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.option-item input[type='checkbox'],
+.option-item input[type='radio'] {
+  accent-color: var(--color-primary);
+  width: 13px;
+  height: 13px;
+  cursor: pointer;
+  flex-shrink: 0;
 }
 </style>

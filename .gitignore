@@ -44,5 +44,14 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Transit poller data exports
-#transit-poller/data/
+# Environment variables (may contain secrets)
+.env
+.env.local
+.env.*.local
+
+# Web dependencies and build output
+web/node_modules/
+web/dist/
+
+# Claude Code config
+.claude/

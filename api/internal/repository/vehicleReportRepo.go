@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"math"
 	"sort"
 	"time"
 
@@ -13,6 +14,15 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
+
+// CrowdRouteEntry holds aggregated crowd-sourced ratings for one route.
+type CrowdRouteEntry struct {
+	RouteID        string  `json:"route_id"`
+	AvgCleanliness float64 `json:"avg_cleanliness"`
+	AvgCrowding    float64 `json:"avg_crowding"`
+	AvgDelay       float64 `json:"avg_delay"`
+	TotalReports   int     `json:"total_reports"`
+}
 
 type VehicleReportRepo struct {
 	cleanlinessCol *mongo.Collection
@@ -83,6 +93,96 @@ func (r *VehicleReportRepo) FindByUserID(ctx context.Context, userID primitive.O
 	// Re-sort merged slice newest first
 	sort.Slice(results, func(i, j int) bool {
 		return results[i].CreatedAt.After(results[j].CreatedAt)
+	})
+
+	return results, nil
+}
+
+// GetCrowdSourceSummary aggregates ratings from all three vehicle report
+// collections and returns one entry per route, sorted by total reports desc.
+func (r *VehicleReportRepo) GetCrowdSourceSummary(ctx context.Context) ([]CrowdRouteEntry, error) {
+	pipeline := bson.A{
+		bson.M{"$group": bson.M{
+			"_id":   "$routeId",
+			"avg":   bson.M{"$avg": "$level"},
+			"count": bson.M{"$sum": 1},
+		}},
+	}
+
+	type colAgg struct {
+		ID    string  `bson:"_id"`
+		Avg   float64 `bson:"avg"`
+		Count int     `bson:"count"`
+	}
+
+	type routeAccum struct {
+		avgClean, avgCrowd, avgDelay float64
+		hasClean, hasCrowd, hasDelay bool
+		total                        int
+	}
+
+	merged := map[string]*routeAccum{}
+
+	for _, entry := range []struct {
+		col   *mongo.Collection
+		field string
+	}{
+		{r.cleanlinessCol, "clean"},
+		{r.crowdingCol, "crowd"},
+		{r.delayCol, "delay"},
+	} {
+		cur, err := entry.col.Aggregate(ctx, pipeline)
+		if err != nil {
+			return nil, err
+		}
+		for cur.Next(ctx) {
+			var row colAgg
+			if err := cur.Decode(&row); err != nil {
+				continue
+			}
+			if row.ID == "" {
+				continue
+			}
+			if _, ok := merged[row.ID]; !ok {
+				merged[row.ID] = &routeAccum{}
+			}
+			d := merged[row.ID]
+			switch entry.field {
+			case "clean":
+				d.avgClean = row.Avg
+				d.hasClean = true
+			case "crowd":
+				d.avgCrowd = row.Avg
+				d.hasCrowd = true
+			case "delay":
+				d.avgDelay = row.Avg
+				d.hasDelay = true
+			}
+			d.total += row.Count
+		}
+		cur.Close(ctx)
+	}
+
+	results := make([]CrowdRouteEntry, 0, len(merged))
+	for routeID, d := range merged {
+		e := CrowdRouteEntry{
+			RouteID:      routeID,
+			TotalReports: d.total,
+		}
+		if d.hasClean {
+			e.AvgCleanliness = math.Round(d.avgClean*10) / 10
+		}
+		if d.hasCrowd {
+			e.AvgCrowding = math.Round(d.avgCrowd*10) / 10
+		}
+		if d.hasDelay {
+			e.AvgDelay = math.Round(d.avgDelay*10) / 10
+		}
+		results = append(results, e)
+	}
+
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].TotalReports > results[j].TotalReports
 	})
 
 	return results, nil
