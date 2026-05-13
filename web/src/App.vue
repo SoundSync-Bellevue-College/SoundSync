@@ -9,14 +9,20 @@
 </template>
 
 <script setup lang="ts">
-import { watch } from 'vue'
+import { watch, onMounted } from 'vue'
 import AppHeader from '@/components/common/AppHeader.vue'
 import NotificationToast from '@/components/common/NotificationToast.vue'
 import { useAuthStore } from '@/stores/authStore'
 import { useNotificationStore } from '@/stores/notificationStore'
+import { useServiceAlertStore } from '@/stores/serviceAlertStore'
 
 const auth = useAuthStore()
 const notif = useNotificationStore()
+const serviceAlerts = useServiceAlertStore()
+
+onMounted(() => {
+  serviceAlerts.startPolling()
+})
 
 watch(
   () => auth.isLoggedIn,
