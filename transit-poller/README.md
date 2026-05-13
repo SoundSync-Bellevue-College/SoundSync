@@ -370,6 +370,81 @@ curl -s "http://localhost:8080/api/v1/arrivals/stats?routeId=100001&stopId=1_676
 
 ---
 
+### Service Alerts
+
+> Handler: `api/internal/handlers/serviceAlerts.go`
+> Service: `api/internal/services/serviceAlertsService.go`
+> PostgreSQL table: `service_alerts` (written by `transit-poller/poller.py` every 60 seconds)
+
+Returns currently active service alerts sourced from Sound Transit and King County Metro GTFS-RT feeds. An alert is considered active when the current time falls within its `active_period`. No auth token required.
+
+#### `GET /api/v1/service-alerts`
+
+**Query params:**
+
+| Param | Required | Description |
+|-------|----------|-------------|
+| `agency` | no | Filter by agency: `sound_transit` or `king_county_metro` |
+
+**Examples:**
+```bash
+# All active alerts
+curl http://localhost:8080/api/v1/service-alerts
+
+# Sound Transit only
+curl "http://localhost:8080/api/v1/service-alerts?agency=sound_transit"
+
+# King County Metro only
+curl "http://localhost:8080/api/v1/service-alerts?agency=king_county_metro"
+```
+
+**Response:**
+```json
+{
+  "alerts": [
+    {
+      "alertId": "16985",
+      "agency": "sound_transit",
+      "effect": "ACCESSIBILITY_ISSUE",
+      "cause": "UNKNOWN_CAUSE",
+      "headerText": "Capitol Hill Station elevator 1 out of service due to scheduled maintenance.",
+      "descriptionText": "To ride the 1 Line and 2 Line from the street: Go to Broadway Ave E...",
+      "severityLevel": "WARNING",
+      "activePeriodStart": 1774672500,
+      "url": "https://SoundTransit.org/alert/st/16985",
+      "informedEntities": [
+        {
+          "agency_id": "40",
+          "route_type": 0,
+          "route_id": "100479",
+          "stop_id": "99603"
+        }
+      ],
+      "lastSeen": "2026-05-13T18:45:00Z"
+    }
+  ]
+}
+```
+
+**Response fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `alertId` | string | Unique ID from the source feed |
+| `agency` | string | `sound_transit` or `king_county_metro` |
+| `effect` | string | e.g. `NO_SERVICE`, `DETOUR`, `ACCESSIBILITY_ISSUE` |
+| `cause` | string | e.g. `CONSTRUCTION`, `MAINTENANCE` |
+| `headerText` | string | Short summary of the alert |
+| `descriptionText` | string | Full alert details and instructions |
+| `severityLevel` | string | `WARNING` or `SEVERE` |
+| `activePeriodStart` | integer | Unix timestamp when the alert becomes active |
+| `activePeriodEnd` | integer | Unix timestamp when the alert expires (omitted if open-ended) |
+| `informedEntities` | array | Affected routes and stops (GTFS `informed_entity` objects) |
+| `url` | string | Link to the full alert page (omitted if none) |
+| `lastSeen` | string | ISO 8601 timestamp of the last poller sync |
+
+---
+
 ### Health Check
 
 > Handler: `backend/internal/api/handler.go` → `health()`
