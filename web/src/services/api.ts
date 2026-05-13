@@ -20,6 +20,12 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    if (error.response?.status === 401 && !error.config?.url?.includes('/auth/')) {
+      localStorage.removeItem('soundsync_token')
+      localStorage.removeItem('soundsync_user')
+      window.location.href = '/login'
+      return Promise.reject(new Error('Session expired. Please sign in again.'))
+    }
     const message = error.response?.data?.message || error.message || 'Unknown error'
     return Promise.reject(new Error(message))
   },

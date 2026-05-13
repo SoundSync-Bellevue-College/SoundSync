@@ -76,6 +76,7 @@ func New(cfg *config.Config, db *mongo.Database, pgDB *sql.DB) http.Handler {
 
 		// Routes (public)
 		r.Get("/routes/plan", routeH.PlanRoute)
+		r.Get("/routes/{routeId}/shape", routeH.GetRouteShape)
 		r.Get("/routes/{routeId}", routeH.GetRoute)
 
 		// Weather (public)
@@ -84,6 +85,8 @@ func New(cfg *config.Config, db *mongo.Database, pgDB *sql.DB) http.Handler {
 
 		// Service alerts (public)
 		r.Get("/service-alerts", serviceAlertsH.GetAlerts)
+		// Crowd-sourced ratings (public)
+		r.Get("/crowdsource/summary", vehicleReportH.GetCrowdSourceSummary)
 
 		// Reliability & prediction (public) — register /summary before /{stopId}
 		r.Get("/reliability/summary", reliabilityH.GetSummary)

@@ -9,6 +9,7 @@
 
     <nav class="header-nav">
       <RouterLink to="/" class="nav-link">Map</RouterLink>
+      <RouterLink to="/score" class="nav-link">Score</RouterLink>
       <RouterLink v-if="auth.isLoggedIn" to="/account" class="nav-link">Account</RouterLink>
     </nav>
 

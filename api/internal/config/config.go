@@ -14,11 +14,13 @@ type Config struct {
 	MongoDB        string
 	JWTSecret      string
 	GoogleMapsKey  string
-	GTFSVehicleURL string
-	GTFSTripURL    string
-	GTFSAlertURL   string
+	GTFSVehicleURL     string
+	GTFSRailVehicleURL string
+	GTFSTripURL        string
+	GTFSAlertURL       string
 	OBABaseURL     string
 	OBAApiKey      string
+	WSFApiKey      string
 	// PostgreSQL — transit poller arrivals database
 	PGHost     string
 	PGPort     string
@@ -44,13 +46,16 @@ func Load() *Config {
 		MongoDB:   getEnv("MONGO_DB", "soundsync"),
 		JWTSecret: getEnv("JWT_SECRET", "change_me_in_production"),
 		GoogleMapsKey: getEnv("GOOGLE_MAPS_API_KEY", ""),
-		GTFSVehicleURL: getEnv("GTFS_VEHICLE_POSITIONS_URL", ""), // deprecated KCM S3 feed; set to override
+		GTFSVehicleURL: getEnv("GTFS_VEHICLE_POSITIONS_URL", ""), // KCM bus feed; set to override
+		GTFSRailVehicleURL: getEnv("GTFS_RAIL_VEHICLE_POSITIONS_URL",
+			"https://s3.amazonaws.com/gtfs.soundtransit.org/VehiclePositions_enhanced.pb"),
 		GTFSTripURL: getEnv("GTFS_TRIP_UPDATES_URL",
 			"https://s3.amazonaws.com/gtfs.soundtransit.org/TripUpdate_enhanced.pb"),
 		GTFSAlertURL: getEnv("GTFS_SERVICE_ALERTS_URL",
 			"https://s3.amazonaws.com/gtfs.soundtransit.org/ServiceAlert_enhanced.pb"),
 		OBABaseURL: getEnv("OBA_BASE_URL", "https://api.pugetsound.onebusaway.org"),
 		OBAApiKey:  getEnv("OBA_API_KEY", "TEST"),
+		WSFApiKey:  getEnv("WSF_API_KEY", ""), // optional — WSDOT ferry API access code
 		PGHost:     getEnv("PG_HOST", "localhost"),
 		PGPort:     getEnv("PG_PORT", "5432"),
 		PGDBName:   getEnv("PG_DBNAME", "soundsync"),
