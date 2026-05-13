@@ -1,12 +1,14 @@
 import axios from 'axios'
 
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+
 const api = axios.create({
-  baseURL: '/api/v1',
+  baseURL: `${API_BASE_URL}/api/v1`,
   timeout: 10_000,
   headers: { 'Content-Type': 'application/json' },
 })
 
-// Attach JWT from localStorage on every request
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('soundsync_token')
   if (token) {
@@ -15,7 +17,6 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// Surface error messages from the backend
 api.interceptors.response.use(
   (response) => response,
   (error) => {

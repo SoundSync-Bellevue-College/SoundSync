@@ -26,7 +26,7 @@ func New(cfg *config.Config, db *mongo.Database, pgDB *sql.DB) http.Handler {
 	r.Use(chimiddleware.Logger)
 	r.Use(chimiddleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:5173", "http://localhost:4173", "http://localhost:3003"},
+		AllowedOrigins:   []string{"http://localhost:5173", "http://localhost:4173", "http://localhost:3003", "https://main.d2dd6tqv6d382s.amplifyapp.com"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
 		AllowCredentials: true,

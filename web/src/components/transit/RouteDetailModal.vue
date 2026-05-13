@@ -183,8 +183,15 @@ const loadingWeather = ref(false)
 onMounted(async () => {
   const l = leg.value
   // departure_time.value is Unix seconds; fall back to now
-  const baseMs = (l.departure_time?.value ?? Math.floor(Date.now() / 1000)) * 1000
-  let elapsedMs = 0
+  const departureValue = l.departure_time?.value
+
+  const baseMs =
+    typeof departureValue === 'number'
+      ? departureValue * 1000
+      : Date.now()
+
+let elapsedMs = 0
+
 
   // Collect walk steps with their computed absolute start time + coordinates
   const walkFetches: Array<{ index: number; lat: number; lng: number; timeMs: number }> = []
