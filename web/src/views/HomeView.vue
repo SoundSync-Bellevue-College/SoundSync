@@ -5,6 +5,7 @@
       <div class="sidebar-top">
         <WeatherWidget />
       </div>
+      <RouteTrackPanel />
       <RouteSearchPanel />
 
       <!-- Stop panel — shown when a stop is selected on the map -->
@@ -31,6 +32,7 @@
 <script setup lang="ts">
 import MapContainer from '@/components/map/MapContainer.vue'
 import RouteSearchPanel from '@/components/transit/RouteSearchPanel.vue'
+import RouteTrackPanel from '@/components/transit/RouteTrackPanel.vue'
 import WeatherWidget from '@/components/weather/WeatherWidget.vue'
 import ArrivalBoard from '@/components/transit/ArrivalBoard.vue'
 import { useMapStore } from '@/stores/mapStore'

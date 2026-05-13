@@ -16,10 +16,13 @@ export const useMapStore = defineStore('map', () => {
   const error = ref<string | null>(null)
   const showOnlyPlanned = ref(false)
   const vehicleTypeFilter = ref<'ALL' | 'BUS' | 'RAIL'>('ALL')
-  const mapTypeId = ref<'roadmap' | 'satellite' | 'hybrid' | 'terrain'>('roadmap')
+  const mapTypeId = ref<'roadmap' | 'satellite' | 'hybrid' | 'terrain'>('hybrid')
   const showTransitLayer = ref(false)
   const showTrafficLayer = ref(false)
   const showBikingLayer = ref(false)
+  // Route tracking — numeric OBA route ID (e.g. "100001") and its short name
+  const trackedRouteId = ref<string | null>(null)
+  const trackedShortName = ref<string | null>(null)
 
   let pollTimer: ReturnType<typeof setInterval> | null = null
 
@@ -84,6 +87,8 @@ export const useMapStore = defineStore('map', () => {
     showTransitLayer,
     showTrafficLayer,
     showBikingLayer,
+    trackedRouteId,
+    trackedShortName,
     fetchVehicles,
     fetchNearbyStops,
     startPolling,

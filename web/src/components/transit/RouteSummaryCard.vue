@@ -1,5 +1,22 @@
 <template>
-  <div class="route-summary" role="button" tabindex="0" title="Click for full details" @click="$emit('detail')" @keydown.enter="$emit('detail')"  >
+  <div class="route-summary">
+
+    <!-- Route option tabs (only shown when > 1 route) -->
+    <div v-if="result.routes.length > 1" class="route-tabs">
+      <button
+        v-for="(route, i) in result.routes"
+        :key="i"
+        class="route-tab"
+        :class="{ active: routeStore.selectedRouteIndex === i }"
+        @click="routeStore.selectedRouteIndex = i"
+      >
+        Option {{ i + 1 }}
+        <span class="tab-duration">{{ route.legs[0]?.duration?.text }}</span>
+      </button>
+    </div>
+
+    <!-- Clickable card body -->
+    <div class="summary-body" role="button" tabindex="0" title="Click for full details" @click="$emit('detail')" @keydown.enter="$emit('detail')">
     <!-- Header: total time + depart/arrive -->
     <div class="summary-header">
       <span class="summary-duration">{{ leg.duration?.text }}</span>
@@ -49,15 +66,42 @@
       </li>
     </ol>
 
-    <!-- Fare if available -->
-    <div v-if="result.routes[0]?.fare" class="fare-row">
-      <span>Fare: {{ result.routes[0].fare?.text }}</span>
+    </div><!-- end summary-body -->
+
+    <!-- Fare breakdown -->
+    <div v-if="fareBreakdown" class="fare-section">
+      <div class="fare-title">Estimated Fare (ORCA)</div>
+      <div class="fare-rows">
+        <div v-if="fareBreakdown.busCost > 0" class="fare-line">
+          <span class="fare-mode">
+            <span class="fare-dot" style="background:#f97316"></span>Bus
+          </span>
+          <span class="fare-amount">${{ fareBreakdown.busCost.toFixed(2) }}</span>
+        </div>
+        <div v-if="fareBreakdown.railCost > 0" class="fare-line">
+          <span class="fare-mode">
+            <span class="fare-dot" style="background:#a855f7"></span>Rail / LRT
+          </span>
+          <span class="fare-amount">${{ fareBreakdown.railCost.toFixed(2) }}</span>
+        </div>
+        <div v-if="fareBreakdown.ferryCost > 0" class="fare-line">
+          <span class="fare-mode">
+            <span class="fare-dot" style="background:#0ea5e9"></span>Ferry
+          </span>
+          <span class="fare-amount">${{ fareBreakdown.ferryCost.toFixed(2) }}</span>
+        </div>
+        <div class="fare-line fare-total">
+          <span class="fare-mode">Total</span>
+          <span class="fare-amount">${{ fareBreakdown.total.toFixed(2) }}</span>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useRouteStore } from '@/stores/routeStore'
 
 const props = defineProps<{
   result: google.maps.DirectionsResult
@@ -65,8 +109,9 @@ const props = defineProps<{
 
 defineEmits<{ detail: [] }>()
 
-// Use the first route's first leg
-const leg = computed(() => props.result.routes[0]?.legs[0])
+const routeStore = useRouteStore()
+
+const leg = computed(() => props.result.routes[routeStore.selectedRouteIndex]?.legs[0])
 
 function transitIcon(transit: google.maps.TransitDetails): string {
   const type = transit.line?.vehicle?.type
@@ -81,27 +126,114 @@ function transitBadgeStyle(transit: google.maps.TransitDetails): Record<string, 
   const text = transit.line?.text_color ?? '#ffffff'
   return { background: bg, color: text }
 }
+
+// Puget Sound ORCA per-boarding estimates
+const FARE: Record<string, number> = {
+  BUS:            2.75,
+  SUBWAY:         2.75,
+  TRAM:           3.25,
+  LIGHT_RAIL:     3.25,
+  MONORAIL:       3.25,
+  HEAVY_RAIL:     5.00,
+  COMMUTER_TRAIN: 5.00,
+  FERRY:          7.70,
+}
+
+const fareBreakdown = computed(() => {
+  const route = props.result.routes[routeStore.selectedRouteIndex]
+  if (!route) return null
+
+  let busCost = 0, railCost = 0, ferryCost = 0
+
+  for (const leg of route.legs) {
+    for (const step of leg.steps) {
+      if (step.travel_mode !== 'TRANSIT' || !step.transit) continue
+      const type = step.transit.line?.vehicle?.type ?? 'BUS'
+      const rate = FARE[type] ?? 2.75
+      if (type === 'FERRY') ferryCost += rate
+      else if (type === 'HEAVY_RAIL' || type === 'COMMUTER_TRAIN') railCost += rate
+      else if (type === 'TRAM' || type === 'LIGHT_RAIL' || type === 'MONORAIL' || type === 'SUBWAY') railCost += rate
+      else busCost += rate
+    }
+  }
+
+  const total = busCost + railCost + ferryCost
+  if (total === 0) return null
+  return { busCost, railCost, ferryCost, total }
+})
 </script>
 
 <style scoped>
 .route-summary {
   background: var(--color-bg);
   border-radius: var(--radius-md);
-  padding: 0.85rem;
   margin-top: 0.25rem;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+}
+
+/* Route option tabs */
+.route-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.route-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  padding: 0.4rem 0.5rem;
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.route-tab:last-child {
+  border-right: none;
+}
+
+.route-tab:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-text);
+}
+
+.route-tab.active {
+  background: rgba(59, 130, 246, 0.15);
+  color: #93c5fd;
+  border-bottom: 2px solid #3b82f6;
+}
+
+.tab-duration {
+  font-size: 0.68rem;
+  font-weight: 400;
+  color: inherit;
+  opacity: 0.8;
+}
+
+/* Clickable body */
+.summary-body {
+  padding: 0.85rem;
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
   cursor: pointer;
-  border: 1px solid transparent;
-  transition: border-color 0.15s;
+  transition: background 0.12s;
 }
 
-.route-summary:hover {
-  border-color: var(--color-primary);
+.summary-body:hover {
+  background: rgba(255, 255, 255, 0.03);
 }
 
-.route-summary::after {
+.summary-body::after {
   content: 'Tap for full details →';
   font-size: 0.68rem;
   color: var(--color-primary);
@@ -221,10 +353,58 @@ function transitBadgeStyle(transit: google.maps.TransitDetails): Record<string, 
   font-style: italic;
 }
 
-.fare-row {
-  font-size: 0.75rem;
-  color: var(--color-text-muted);
+.fare-section {
   border-top: 1px solid var(--color-border);
-  padding-top: 0.4rem;
+  padding: 0.5rem 0.85rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.fare-title {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.fare-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.fare-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.fare-mode {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.fare-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.fare-amount {
+  font-variant-numeric: tabular-nums;
+}
+
+.fare-total {
+  border-top: 1px solid var(--color-border);
+  margin-top: 0.15rem;
+  padding-top: 0.2rem;
+  font-weight: 700;
+  color: var(--color-text);
 }
 </style>

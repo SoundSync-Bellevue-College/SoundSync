@@ -104,29 +104,40 @@ function vehicleSuffix(vehicleId: string): string {
   return id.length > 0 ? id.slice(-3) : vehicleId.slice(-3)
 }
 
+// Fallback colors per GTFS route_type when the route has no custom color
+const TYPE_COLORS: Record<number, { bg: string; text: string }> = {
+  0: { bg: '#22c55e', text: '#ffffff' }, // Tram / Light Rail — green
+  1: { bg: '#a855f7', text: '#ffffff' }, // Subway           — purple
+  2: { bg: '#f59e0b', text: '#ffffff' }, // Rail / Train     — amber
+  3: { bg: '#f97316', text: '#ffffff' }, // Bus              — orange
+  4: { bg: '#0ea5e9', text: '#ffffff' }, // Ferry            — cyan
+}
+
 async function makeIcon(vehicle: VehiclePosition): Promise<google.maps.Icon> {
   const lookup = await getRouteLookup()
   const info = lookup.get(vehicle.routeId)
-  const routeName = info?.shortName ?? vehicle.routeId
-  const suffix = vehicleSuffix(vehicle.vehicleId)
-  const label = `${routeName}·${suffix}`
 
-  const routeType = vehicle.routeType ?? (info?.routeType === 0 || info?.routeType === 1 || info?.routeType === 2 ? 'RAIL' : 'BUS')
+  // WSF ferries: vehicleId is "wsf-{VesselName}" — show the vessel name directly
+  const isWSF = vehicle.vehicleId.startsWith('wsf-')
+  const label = isWSF
+    ? vehicle.vehicleId.replace('wsf-', '')
+    : `${info?.shortName ?? vehicle.routeId}·${vehicleSuffix(vehicle.vehicleId)}`
 
+  const gtfsType = info?.routeType ?? 3
+  const fallback = TYPE_COLORS[gtfsType] ?? TYPE_COLORS[3]
+  const color     = info?.color     ?? fallback.bg
+  const textColor = info?.textColor ?? fallback.text
+
+  // Tram (0), Subway (1), Rail (2), or STREETCAR string → diamond rail icon
+  const routeType = vehicle.routeType ?? (gtfsType <= 2 ? 'RAIL' : 'BUS')
   if (routeType === 'RAIL' || routeType === 'STREETCAR') {
-    const color = info?.color ?? '#5C7BA2'
-    const textColor = info?.textColor ?? '#ffffff'
     return buildRailIcon(label, color, textColor)
   }
 
-  if (routeType === 'FERRY') {
-    const color = info?.color ?? '#0ea5e9'
-    const textColor = info?.textColor ?? '#ffffff'
+  if (routeType === 'FERRY' || gtfsType === 4) {
     return buildFerryIcon(label, color, textColor)
   }
 
-  const color = info?.color ?? '#3b82f6'
-  const textColor = info?.textColor ?? '#ffffff'
   return buildBusIcon(label, color, textColor, vehicle.bearing ?? 0)
 }
 

@@ -123,7 +123,70 @@ func (s *TransitService) loadVehicles(ctx context.Context) ([]models.VehiclePosi
 	combined := make([]models.VehiclePosition, 0, len(buses)+len(rail))
 	combined = append(combined, buses...)
 	combined = append(combined, rail...)
+
+	// ── 4. Washington State Ferries (always appended when available) ──────────
+	ferries, err := s.fetchFromWSF(ctx)
+	if err != nil {
+		log.Printf("WSF ferry fetch error: %v", err)
+	} else {
+		log.Printf("Loaded %d vessels from WSF", len(ferries))
+		combined = append(combined, ferries...)
+	}
+
 	return combined, nil
+}
+
+// wsfVesselLocation mirrors the WSDOT Ferries API vessel location JSON.
+type wsfVesselLocation struct {
+	VesselID             int     `json:"VesselID"`
+	VesselName           string  `json:"VesselName"`
+	Lat                  float64 `json:"Lat"`
+	Lon                  float64 `json:"Lon"`
+	Heading              float64 `json:"Heading"`
+	Speed                float64 `json:"Speed"`
+	InService            bool    `json:"InService"`
+	AtDock               bool    `json:"AtDock"`
+	DepartingTerminalName string `json:"DepartingTerminalName"`
+	ArrivingTerminalName  string `json:"ArrivingTerminalName"`
+}
+
+// fetchFromWSF fetches live vessel positions from the WSDOT Ferries API.
+// No API key is required; WSF_API_KEY in .env provides an optional access code.
+func (s *TransitService) fetchFromWSF(ctx context.Context) ([]models.VehiclePosition, error) {
+	url := "https://www.wsdot.wa.gov/ferries/api/vessels/rest/vessellocations"
+	if s.cfg.WSFApiKey != "" {
+		url += "?apiaccesscode=" + s.cfg.WSFApiKey
+	}
+
+	data, err := fetchFeed(ctx, url)
+	if err != nil {
+		return nil, fmt.Errorf("WSF vessel locations: %w", err)
+	}
+
+	var vessels []wsfVesselLocation
+	if err := json.Unmarshal(data, &vessels); err != nil {
+		return nil, fmt.Errorf("decode WSF response: %w", err)
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	result := make([]models.VehiclePosition, 0, len(vessels))
+	for _, v := range vessels {
+		if !v.InService || v.Lat == 0 || v.Lon == 0 {
+			continue
+		}
+		result = append(result, models.VehiclePosition{
+			VehicleID: fmt.Sprintf("wsf-%s", v.VesselName),
+			RouteID:   "WSF",
+			TripID:    fmt.Sprintf("wsf-%d", v.VesselID),
+			Lat:       v.Lat,
+			Lng:       v.Lon,
+			Bearing:   float32(v.Heading),
+			Speed:     float32(v.Speed),
+			Timestamp: now,
+			RouteType: "FERRY",
+		})
+	}
+	return result, nil
 }
 
 // tagRouteTypes sets RouteType on each vehicle based on its RouteID.

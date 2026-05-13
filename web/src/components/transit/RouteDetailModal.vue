@@ -118,10 +118,33 @@
           </div>
         </div>
 
-        <!-- Footer: fare -->
-        <div v-if="result.routes[0]?.fare" class="modal-footer">
-          <span class="fare-label">Estimated fare</span>
-          <span class="fare-value">{{ result.routes[0].fare?.text }}</span>
+        <!-- Footer: fare breakdown -->
+        <div v-if="fareBreakdown" class="modal-footer">
+          <span class="fare-label">Estimated Fare (ORCA)</span>
+          <div class="fare-breakdown">
+            <div v-if="fareBreakdown.busCost > 0" class="fare-line">
+              <span class="fare-mode">
+                <span class="fare-dot" style="background:#f97316"></span>Bus
+              </span>
+              <span class="fare-amt">${{ fareBreakdown.busCost.toFixed(2) }}</span>
+            </div>
+            <div v-if="fareBreakdown.railCost > 0" class="fare-line">
+              <span class="fare-mode">
+                <span class="fare-dot" style="background:#a855f7"></span>Rail / LRT
+              </span>
+              <span class="fare-amt">${{ fareBreakdown.railCost.toFixed(2) }}</span>
+            </div>
+            <div v-if="fareBreakdown.ferryCost > 0" class="fare-line">
+              <span class="fare-mode">
+                <span class="fare-dot" style="background:#0ea5e9"></span>Ferry
+              </span>
+              <span class="fare-amt">${{ fareBreakdown.ferryCost.toFixed(2) }}</span>
+            </div>
+            <div class="fare-line fare-total">
+              <span class="fare-mode">Total</span>
+              <span class="fare-amt">${{ fareBreakdown.total.toFixed(2) }}</span>
+            </div>
+          </div>
         </div>
 
       </div>
@@ -133,9 +156,11 @@
 import { ref, computed, onMounted } from 'vue'
 import { weatherService } from '@/services/weatherService'
 import { useAuthStore } from '@/stores/authStore'
+import { useRouteStore } from '@/stores/routeStore'
 import type { HourlyPeriod } from '@/types/weather'
 
 const auth = useAuthStore()
+const routeStore = useRouteStore()
 
 function displayTemp(tempF: number): string {
   if (auth.tempUnit === 'C') return Math.round((tempF - 32) * 5 / 9) + '°C'
@@ -148,7 +173,7 @@ const props = defineProps<{
 
 defineEmits<{ close: [] }>()
 
-const leg = computed(() => props.result.routes[0].legs[0])
+const leg = computed(() => props.result.routes[routeStore.selectedRouteIndex]?.legs[0])
 
 // ── Weather per walk step (keyed by step index) ───────────────────────────────
 
@@ -237,6 +262,37 @@ function lineBadgeStyle(transit: google.maps.TransitDetails): Record<string, str
     color: transit.line?.text_color ?? '#ffffff',
   }
 }
+
+const FARE: Record<string, number> = {
+  BUS:            2.75,
+  SUBWAY:         2.75,
+  TRAM:           3.25,
+  LIGHT_RAIL:     3.25,
+  MONORAIL:       3.25,
+  HEAVY_RAIL:     5.00,
+  COMMUTER_TRAIN: 5.00,
+  FERRY:          7.70,
+}
+
+const fareBreakdown = computed(() => {
+  const route = props.result.routes[routeStore.selectedRouteIndex]
+  if (!route) return null
+  let busCost = 0, railCost = 0, ferryCost = 0
+  for (const leg of route.legs) {
+    for (const step of leg.steps) {
+      if (step.travel_mode !== 'TRANSIT' || !step.transit) continue
+      const type = step.transit.line?.vehicle?.type ?? 'BUS'
+      const rate = FARE[type] ?? 2.75
+      if (type === 'FERRY') ferryCost += rate
+      else if (type === 'HEAVY_RAIL' || type === 'COMMUTER_TRAIN') railCost += rate
+      else if (type === 'TRAM' || type === 'LIGHT_RAIL' || type === 'MONORAIL' || type === 'SUBWAY') railCost += rate
+      else busCost += rate
+    }
+  }
+  const total = busCost + railCost + ferryCost
+  if (total === 0) return null
+  return { busCost, railCost, ferryCost, total }
+})
 </script>
 
 <style scoped>
@@ -473,11 +529,60 @@ function lineBadgeStyle(transit: google.maps.TransitDetails): Record<string, str
 .modal-footer {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   padding: 0.75rem 1.25rem;
   border-top: 1px solid var(--color-border);
   flex-shrink: 0;
+  gap: 1rem;
 }
-.fare-label { font-size: 0.78rem; color: var(--color-text-muted); }
-.fare-value { font-size: 0.9rem; font-weight: 700; color: var(--color-text); }
+
+.fare-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  padding-top: 0.15rem;
+}
+
+.fare-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 160px;
+}
+
+.fare-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.fare-mode {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.fare-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.fare-amt {
+  font-variant-numeric: tabular-nums;
+}
+
+.fare-total {
+  border-top: 1px solid var(--color-border);
+  margin-top: 0.15rem;
+  padding-top: 0.2rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
 </style>

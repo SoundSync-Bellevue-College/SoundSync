@@ -20,6 +20,7 @@ type Config struct {
 	GTFSAlertURL       string
 	OBABaseURL     string
 	OBAApiKey      string
+	WSFApiKey      string
 	// PostgreSQL — transit poller arrivals database
 	PGHost     string
 	PGPort     string
@@ -54,6 +55,7 @@ func Load() *Config {
 			"https://s3.amazonaws.com/gtfs.soundtransit.org/ServiceAlert_enhanced.pb"),
 		OBABaseURL: getEnv("OBA_BASE_URL", "https://api.pugetsound.onebusaway.org"),
 		OBAApiKey:  getEnv("OBA_API_KEY", "TEST"),
+		WSFApiKey:  getEnv("WSF_API_KEY", ""), // optional — WSDOT ferry API access code
 		PGHost:     getEnv("PG_HOST", "localhost"),
 		PGPort:     getEnv("PG_PORT", "5432"),
 		PGDBName:   getEnv("PG_DBNAME", "soundsync"),

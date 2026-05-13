@@ -47,3 +47,14 @@ func (h *RouteHandler) GetRoute(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonOK(w, route, http.StatusOK)
 }
+
+// GET /routes/{routeId}/shape — returns encoded polylines and stops for a route from OBA.
+func (h *RouteHandler) GetRouteShape(w http.ResponseWriter, r *http.Request) {
+	routeID := chi.URLParam(r, "routeId")
+	result, err := h.routeSvc.GetRouteShape(r.Context(), routeID)
+	if err != nil || len(result.Polylines) == 0 {
+		jsonError(w, "failed to fetch route shape", http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, result, http.StatusOK)
+}
