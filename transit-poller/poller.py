@@ -5,7 +5,7 @@ import os
 import json
 from dotenv import load_dotenv
 from datetime import datetime
-from stops import BELLEVUE_STOPS
+from stops import BELLEVUE_STOPS, SEATTLE_STOPS
 
 load_dotenv()
 
@@ -178,7 +178,8 @@ def store_arrivals(conn, stop_id, arrivals):
 
 def run():
     init_db()
-    print(f"Starting poller. Checking {len(BELLEVUE_STOPS)} stops every 60 seconds...\n")
+    all_stops = BELLEVUE_STOPS + SEATTLE_STOPS
+    print(f"Starting poller. Checking {len(all_stops)} stops ({len(BELLEVUE_STOPS)} Bellevue + {len(SEATTLE_STOPS)} Seattle) every 60 seconds...\n")
     while True:
         try:
             timestamp = datetime.now().strftime("%H:%M:%S")
@@ -202,7 +203,7 @@ def run():
                 continue
 
             total = 0
-            for stop_id in BELLEVUE_STOPS:
+            for stop_id in all_stops:
                 try:
                     arrivals = fetch_arrivals(stop_id)
                     saved = store_arrivals(conn, stop_id, arrivals)
