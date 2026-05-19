@@ -41,7 +41,7 @@ class TransitRouteSheet extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+              padding: const EdgeInsets.fromLTRB(20, 0, 12, 12),
               child: Row(
                 children: [
                   const Icon(Icons.directions_transit,
@@ -57,6 +57,12 @@ class TransitRouteSheet extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white38, size: 20),
+                    onPressed: () => Navigator.of(context).pop(),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
                   ),
                 ],
               ),
