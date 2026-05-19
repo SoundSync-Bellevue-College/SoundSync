@@ -91,7 +91,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   List<PlaceSuggestion> _suggestions = [];
   bool _loadingSuggestions = false;
-  bool _showSuggestions = false;
   Map<String, dynamic>? _tappedVehicle; // {vehicleId, shortName, routeId}
   Marker? _destinationMarker;
   Timer? _debounce;
@@ -101,6 +100,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   TransitRoute? _activeRoute;
   bool _navStepsExpanded = false;
   bool _filterToRouteOnly = false;
+  bool _searchOverlayVisible = false;
   Set<String> _activeRouteShortNames = {};
   List<Map<String, dynamic>> _lastVehicles = [];
 
@@ -112,11 +112,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.light,
     ));
-    _searchFocus.addListener(() {
-      if (!_searchFocus.hasFocus) {
-        setState(() => _showSuggestions = false);
-      }
-    });
   }
 
   @override
@@ -132,7 +127,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (value.trim().isEmpty) {
       setState(() {
         _suggestions = [];
-        _showSuggestions = false;
+
         _loadingSuggestions = false;
       });
       return;
@@ -143,7 +138,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (mounted) {
         setState(() {
           _suggestions = results;
-          _showSuggestions = results.isNotEmpty;
           _loadingSuggestions = false;
         });
       }
@@ -154,9 +148,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _searchCtrl.text = s.mainText;
     _searchFocus.unfocus();
     setState(() {
-      _showSuggestions = false;
       _suggestions = [];
       _loadingSuggestions = true;
+      _searchOverlayVisible = false;
     });
 
     final result = await GeocodingService.placeDetails(s.placeId);
@@ -342,12 +336,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     });
   }
 
+  void _openSearch() {
+    setState(() => _searchOverlayVisible = true);
+    Future.microtask(() => _searchFocus.requestFocus());
+  }
+
+  void _closeSearch() {
+    _searchFocus.unfocus();
+    setState(() {
+      _searchOverlayVisible = false;
+      _suggestions = [];
+    });
+  }
+
   void _clearSearch() {
     _searchCtrl.clear();
     _debounce?.cancel();
     setState(() {
       _suggestions = [];
-      _showSuggestions = false;
       _loadingSuggestions = false;
       _destinationMarker = null;
       _destName = null;
@@ -359,6 +365,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _navStepsExpanded = false;
       _filterToRouteOnly = false;
       _activeRouteShortNames = {};
+      _searchOverlayVisible = false;
     });
   }
 
@@ -442,6 +449,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final locationAsync = ref.watch(locationProvider);
     final hasLocation = locationAsync.valueOrNull != null;
     final topPad = MediaQuery.of(context).padding.top;
+    final bottomPad = MediaQuery.of(context).padding.bottom;
 
     vehiclesAsync.whenData(_updateMarkers);
 
@@ -463,66 +471,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               c.setMapStyle(_mapStyle);
             },
             onTap: (_) {
-              _searchFocus.unfocus();
-              setState(() {
-                _showSuggestions = false;
-                _tappedVehicle = null;
-              });
+              if (_searchOverlayVisible) {
+                _closeSearch();
+              }
+              setState(() => _tappedVehicle = null);
             },
           ),
 
-          // Search bar
-          Positioned(
-            top: topPad + 12,
-            left: 16,
-            right: 68, // leave room for the profile button
-            child: Material(
-              elevation: 6,
-              borderRadius: BorderRadius.circular(28),
-              color: Colors.transparent,
-              child: TextField(
-                controller: _searchCtrl,
-                focusNode: _searchFocus,
-                style: const TextStyle(color: Colors.white, fontSize: 15),
-                decoration: InputDecoration(
-                  hintText: 'Search destination...',
-                  hintStyle: const TextStyle(color: Colors.white38),
-                  prefixIcon: _loadingSuggestions
-                      ? const Padding(
-                          padding: EdgeInsets.all(12),
-                          child: SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white54),
-                          ),
-                        )
-                      : const Icon(Icons.search, color: Colors.white54, size: 20),
-                  suffixIcon: _searchCtrl.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.close,
-                              color: Colors.white38, size: 18),
-                          onPressed: _clearSearch,
-                        )
-                      : null,
-                  filled: true,
-                  fillColor: const Color(0xE6122340),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(28),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-                onChanged: _onSearchChanged,
-                textInputAction: TextInputAction.search,
-                onSubmitted: (_) {
-                  if (_suggestions.isNotEmpty) _selectSuggestion(_suggestions.first);
-                },
-              ),
-            ),
-          ),
-
-          // Profile / account button (top-right, beside search bar)
+          // Profile / account button (top-right)
           Positioned(
             top: topPad + 12,
             right: 16,
@@ -531,87 +487,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ),
 
-          // Autocomplete dropdown — separate Positioned so it's never clipped
-          if (_showSuggestions && _suggestions.isNotEmpty)
-            Positioned(
-              top: topPad + 12 + 52 + 6, // below search bar
-              left: 16,
-              right: 16,
-              child: Material(
-                elevation: 8,
-                borderRadius: BorderRadius.circular(16),
-                color: const Color(0xF2122340),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: _suggestions.asMap().entries.map((entry) {
-                      final i = entry.key;
-                      final s = entry.value;
-                      return Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          InkWell(
-                            onTap: () => _selectSuggestion(s),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 13),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.place_outlined,
-                                      color: Color(0xFF7FDBFF), size: 18),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          s.mainText,
-                                          style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w500),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        if (s.secondaryText.isNotEmpty)
-                                          Text(
-                                            s.secondaryText,
-                                            style: const TextStyle(
-                                                color: Colors.white38,
-                                                fontSize: 12),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          if (i < _suggestions.length - 1)
-                            const Divider(height: 1, color: Colors.white10),
-                        ],
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ),
-            ),
-
-          // Weather chip — below search bar, left-aligned
+          // Weather chip — top-left
           Positioned(
-            top: topPad + 12 + 52 + 10,
+            top: topPad + 12,
             left: 16,
-            child: (_showSuggestions || _tappedVehicle != null)
+            child: _tappedVehicle != null || _searchOverlayVisible
                 ? const SizedBox.shrink()
                 : const WeatherChip(),
           ),
 
           // Vehicle info card — shown when a bus marker is tapped
-          if (_tappedVehicle != null && !_showSuggestions)
+          if (_tappedVehicle != null && !_searchOverlayVisible)
             Positioned(
               top: topPad + 12 + 52 + 10,
               left: 16,
@@ -655,6 +541,322 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   _updateMarkers(_lastVehicles);
                 },
                 onCancel: _cancelNavigation,
+              ),
+            ),
+
+          // Bottom search card (Google Maps style — idle state)
+          if (!_searchOverlayVisible && _activeRoute == null)
+            Positioned(
+              bottom: bottomPad + 16,
+              left: 16,
+              right: 16,
+              child: GestureDetector(
+                onTap: _openSearch,
+                child: Container(
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0D1B2A),
+                    borderRadius: BorderRadius.circular(28),
+                    boxShadow: const [
+                      BoxShadow(
+                          color: Colors.black54,
+                          blurRadius: 16,
+                          offset: Offset(0, 4)),
+                    ],
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.search,
+                          color: Color(0xFF7FDBFF), size: 22),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _destName != null
+                              ? _destName!
+                              : 'Search destination...',
+                          style: TextStyle(
+                            color: _destName != null
+                                ? Colors.white
+                                : Colors.white38,
+                            fontSize: 15,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (_destName != null)
+                        GestureDetector(
+                          onTap: _clearSearch,
+                          behavior: HitTestBehavior.opaque,
+                          child: const Padding(
+                            padding: EdgeInsets.only(left: 8),
+                            child: Icon(Icons.close,
+                                color: Colors.white38, size: 18),
+                          ),
+                        )
+                      else
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF122340),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Icon(Icons.directions_transit,
+                              color: Color(0xFF7FDBFF), size: 16),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+          // Full-screen search overlay (Google Maps style)
+          if (_searchOverlayVisible)
+            Positioned.fill(
+              child: Material(
+                color: const Color(0xFF0D1B2A),
+                child: Column(
+                  children: [
+                    // Input section
+                    Container(
+                      color: const Color(0xFF0D1B2A),
+                      child: SafeArea(
+                        bottom: false,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(4, 8, 16, 16),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              // Back button
+                              IconButton(
+                                icon: const Icon(Icons.arrow_back,
+                                    color: Colors.white),
+                                onPressed: _closeSearch,
+                              ),
+                              // Input fields with connecting line
+                              Expanded(
+                                child: Column(
+                                  children: [
+                                    // Origin row
+                                    Container(
+                                      height: 46,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF122340),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 14),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 10,
+                                            height: 10,
+                                            decoration: const BoxDecoration(
+                                              color: Color(0xFF7FDBFF),
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          const Text(
+                                            'Your location',
+                                            style: TextStyle(
+                                                color: Colors.white54,
+                                                fontSize: 14),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    // Connector line
+                                    Row(
+                                      children: [
+                                        const SizedBox(width: 18),
+                                        Container(
+                                            width: 1.5,
+                                            height: 10,
+                                            color: Colors.white24),
+                                      ],
+                                    ),
+                                    // Destination field
+                                    Container(
+                                      height: 46,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF1A3A5C),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                            color: const Color(0xFF7FDBFF)
+                                                .withOpacity(0.5)),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 14),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 10,
+                                            height: 10,
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                  color:
+                                                      const Color(0xFF7FDBFF),
+                                                  width: 2),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: TextField(
+                                              controller: _searchCtrl,
+                                              focusNode: _searchFocus,
+                                              style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 14),
+                                              decoration: InputDecoration(
+                                                hintText: 'Search destination',
+                                                hintStyle: const TextStyle(
+                                                    color: Colors.white38),
+                                                border: InputBorder.none,
+                                                isDense: true,
+                                                contentPadding: EdgeInsets.zero,
+                                              ),
+                                              onChanged: _onSearchChanged,
+                                              textInputAction:
+                                                  TextInputAction.search,
+                                              onSubmitted: (_) {
+                                                if (_suggestions.isNotEmpty) {
+                                                  _selectSuggestion(
+                                                      _suggestions.first);
+                                                }
+                                              },
+                                            ),
+                                          ),
+                                          if (_loadingSuggestions)
+                                            const SizedBox(
+                                              width: 16,
+                                              height: 16,
+                                              child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  color: Colors.white38),
+                                            )
+                                          else if (_searchCtrl.text.isNotEmpty)
+                                            GestureDetector(
+                                              onTap: () {
+                                                _searchCtrl.clear();
+                                                setState(() {
+                                                  _suggestions = [];
+                                          
+                                                });
+                                              },
+                                              child: const Icon(Icons.close,
+                                                  color: Colors.white38,
+                                                  size: 18),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const Divider(height: 1, color: Colors.white10),
+                    // Suggestions list
+                    Expanded(
+                      child: _suggestions.isEmpty && !_loadingSuggestions
+                          ? const Padding(
+                              padding: EdgeInsets.fromLTRB(24, 28, 24, 0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(Icons.history,
+                                          color: Colors.white24, size: 18),
+                                      SizedBox(width: 10),
+                                      Text(
+                                        'Start typing to search',
+                                        style: TextStyle(
+                                            color: Colors.white38,
+                                            fontSize: 14),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ListView.separated(
+                              padding: EdgeInsets.zero,
+                              itemCount: _suggestions.length,
+                              separatorBuilder: (_, __) => const Divider(
+                                height: 1,
+                                color: Colors.white10,
+                                indent: 64,
+                              ),
+                              itemBuilder: (_, i) {
+                                final s = _suggestions[i];
+                                return InkWell(
+                                  onTap: () => _selectSuggestion(s),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 20, vertical: 14),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 36,
+                                          height: 36,
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF122340),
+                                            borderRadius:
+                                                BorderRadius.circular(18),
+                                          ),
+                                          child: const Icon(Icons.place,
+                                              color: Color(0xFF7FDBFF),
+                                              size: 18),
+                                        ),
+                                        const SizedBox(width: 14),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                s.mainText,
+                                                style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 14,
+                                                    fontWeight:
+                                                        FontWeight.w500),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              if (s.secondaryText.isNotEmpty)
+                                                Text(
+                                                  s.secondaryText,
+                                                  style: const TextStyle(
+                                                      color: Colors.white38,
+                                                      fontSize: 12),
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        const Icon(Icons.north_west,
+                                            color: Colors.white24, size: 16),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
               ),
             ),
 
