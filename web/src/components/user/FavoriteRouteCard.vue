@@ -2,10 +2,10 @@
   <div class="fav-card">
     <div class="fav-info">
       <p class="fav-label">{{ favorite.label }}</p>
-      <p class="fav-route">
+      <p v-if="favorite.origin.name" class="fav-route">
         {{ favorite.origin.name }} → {{ favorite.destination.name }}
       </p>
-      <div class="fav-tags">
+      <div v-if="favorite.transitRouteIds.length" class="fav-tags">
         <span v-for="id in favorite.transitRouteIds" :key="id" class="route-tag">
           {{ id }}
         </span>

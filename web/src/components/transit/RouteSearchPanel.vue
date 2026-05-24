@@ -15,6 +15,15 @@
           autocomplete="off"
         />
       </div>
+      <button
+        class="current-location-chip"
+        :class="{ active: usingCurrentLocation, loading: locating }"
+        :disabled="locating"
+        @click="useCurrentLocation"
+      >
+        <span class="chip-dot">{{ locating ? '…' : '📍' }}</span>
+        {{ locating ? 'Detecting…' : 'Current location' }}
+      </button>
     </div>
 
     <!-- Swap button -->
@@ -32,6 +41,27 @@
           placeholder="Destination…"
           autocomplete="off"
         />
+        <button
+          v-if="auth.isLoggedIn && destPlace"
+          class="btn-heart"
+          :class="{ saved: destSaved, saving: savingDest }"
+          :title="destSaved ? 'Saved!' : 'Save location'"
+          :disabled="savingDest"
+          @click="saveDestination"
+        >{{ destSaved ? '♥' : '♡' }}</button>
+      </div>
+
+      <!-- Saved location chips -->
+      <div v-if="auth.isLoggedIn && savedLocations.length" class="saved-chips">
+        <button
+          v-for="loc in savedLocations"
+          :key="loc._id"
+          class="saved-chip"
+          :class="{ active: destPlace?.name === loc.destination.name }"
+          @click="applyFavoriteLocation(loc)"
+        >
+          ♥ {{ loc.label }}
+        </button>
       </div>
     </div>
 
@@ -153,6 +183,93 @@ const auth = useAuthStore()
 const isPlanning = ref(false)
 const locating = ref(false)
 const showDetail = ref(false)
+const usingCurrentLocation = ref(false)
+
+async function useCurrentLocation() {
+  if (!('geolocation' in navigator) || locating.value) return
+  locating.value = true
+  usingCurrentLocation.value = false
+
+  try {
+    const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+      navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000, maximumAge: 60000 })
+    )
+
+    const latlng = new google.maps.LatLng(pos.coords.latitude, pos.coords.longitude)
+
+    // Reverse geocode with type priority; skip plus-code-only results
+    let displayName = `${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`
+    try {
+      const { results } = await new google.maps.Geocoder().geocode({ location: latlng })
+      const TYPE_PRIORITY = ['street_address', 'route', 'neighborhood', 'sublocality_level_1', 'locality']
+      const isPlusCode = (addr: string) => /^[A-Z0-9]{4,8}\+[A-Z0-9]/.test(addr)
+
+      let best: google.maps.GeocoderResult | undefined
+      for (const type of TYPE_PRIORITY) {
+        best = results.find(r => r.types.includes(type) && !isPlusCode(r.formatted_address))
+        if (best) break
+      }
+      best ??= results.find(r => !isPlusCode(r.formatted_address)) ?? results[0]
+      if (best) displayName = best.formatted_address
+    } catch {
+      // Geocoding failed — fall back to coordinates as display name
+    }
+
+    if (originInputEl.value) originInputEl.value.value = displayName
+    originPlace = {
+      geometry: { location: latlng },
+      formatted_address: displayName,
+      name: displayName,
+    }
+    usingCurrentLocation.value = true
+  } catch {
+    // Geolocation denied or timed out — leave field empty
+  } finally {
+    locating.value = false
+  }
+}
+
+// Single-location favorites (origin.name is empty) available as quick-select chips
+const savedLocations = computed(() =>
+  routeStore.favorites.filter(f => !f.origin.name)
+)
+
+function applyFavoriteLocation(loc: (typeof routeStore.favorites)[number]) {
+  if (!destInputEl.value) return
+  destInputEl.value.value = loc.label
+  destPlace = {
+    name: loc.label,
+    geometry: { location: new google.maps.LatLng(loc.destination.lat, loc.destination.lng) },
+    formatted_address: loc.label,
+  }
+  destSaved.value = true
+}
+
+// ── Save destination location ─────────────────────────────────────────────────
+const destSaved = ref(false)
+const savingDest = ref(false)
+
+async function saveDestination() {
+  if (!destPlace?.geometry?.location) return
+  savingDest.value = true
+  try {
+    await routeStore.addFavorite({
+      label: destPlace.name || destInputEl.value?.value || 'Saved Location',
+      origin: { name: '', lat: 0, lng: 0 },
+      destination: {
+        name: destPlace.name || destInputEl.value?.value || '',
+        lat: destPlace.geometry.location.lat(),
+        lng: destPlace.geometry.location.lng(),
+      },
+      transitRouteIds: [],
+    })
+    destSaved.value = true
+  } catch {
+    // silently fail — heart stays empty so user can retry
+  } finally {
+    savingDest.value = false
+  }
+}
 
 const originInputEl = ref<HTMLInputElement | null>(null)
 const destInputEl = ref<HTMLInputElement | null>(null)
@@ -249,6 +366,7 @@ const AC_OPTIONS: google.maps.places.AutocompleteOptions = {
 
 onMounted(async () => {
   await loadGoogleMaps()
+  if (auth.isLoggedIn) routeStore.loadFavorites().catch(() => {})
 
   if (originInputEl.value) {
     originAC = new google.maps.places.Autocomplete(originInputEl.value, AC_OPTIONS)
@@ -257,37 +375,14 @@ onMounted(async () => {
 
   if (destInputEl.value) {
     destAC = new google.maps.places.Autocomplete(destInputEl.value, AC_OPTIONS)
-    destAC.addListener('place_changed', () => { destPlace = destAC!.getPlace() })
+    destAC.addListener('place_changed', () => {
+      destPlace = destAC!.getPlace()
+      destSaved.value = false
+    })
   }
 
-  // Pre-fill From with the user's current location if they haven't typed anything
-  if ('geolocation' in navigator) {
-    locating.value = true
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        locating.value = false
-        // Only fill in if the user hasn't typed anything yet
-        if (originInputEl.value?.value) return
-        const latlng = new google.maps.LatLng(pos.coords.latitude, pos.coords.longitude)
-        const geocoder = new google.maps.Geocoder()
-        geocoder.geocode({ location: latlng }, (results, status) => {
-          if (status !== 'OK' || !results?.length) return
-          // Skip pure plus-codes; prefer street-level results
-          const best = results.find(r => r.types.includes('street_address') || r.types.includes('premise')) ?? results[0]
-          if (originInputEl.value && !originInputEl.value.value) {
-            originInputEl.value.value = best.formatted_address
-            originPlace = {
-              geometry: { location: latlng },
-              formatted_address: best.formatted_address,
-              name: best.formatted_address,
-            }
-          }
-        })
-      },
-      () => { locating.value = false }, // permission denied or error — silently skip
-      { timeout: 8000, maximumAge: 60000 },
-    )
-  }
+  // Auto-fill From with current location on load
+  useCurrentLocation()
 })
 
 function swapPlaces() {
@@ -412,7 +507,7 @@ function planRoute() {
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  padding: 0.5rem 0.75rem 0.5rem 2rem;
+  padding: 0.5rem 2rem 0.5rem 2rem;
   color: var(--color-text);
   font-size: 0.875rem;
   transition: border-color 0.15s;
@@ -686,5 +781,103 @@ function planRoute() {
   height: 13px;
   cursor: pointer;
   flex-shrink: 0;
+}
+
+/* ── Current location chip ───────────────────────────────────────────────── */
+
+.current-location-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.current-location-chip:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.current-location-chip.active {
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.current-location-chip.loading {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.chip-dot { font-size: 0.8rem; line-height: 1; }
+
+/* ── Heart save button ────────────────────────────────────────────────────── */
+
+.btn-heart {
+  position: absolute;
+  right: 0.5rem;
+  background: none;
+  border: none;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 0.1rem;
+  transition: color 0.15s, transform 0.1s;
+}
+
+.btn-heart:hover {
+  color: var(--color-danger);
+}
+
+.btn-heart.saved {
+  color: var(--color-danger);
+}
+
+.btn-heart.saving {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Saved location chips ─────────────────────────────────────────────────── */
+
+.saved-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
+.saved-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.55rem;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+
+.saved-chip:hover {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.saved-chip.active {
+  background: color-mix(in srgb, var(--color-danger) 12%, transparent);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
 }
 </style>
