@@ -42,8 +42,8 @@ export const useMapStore = defineStore('map', () => {
   async function fetchNearbyStops(lat: number, lng: number, radius = 500) {
     try {
       nearbyStops.value = await transitService.getNearbyStops(lat, lng, radius)
-    } catch {
-      // silently skip — stops are optional UI
+    } catch (e) {
+      console.error('[mapStore] fetchNearbyStops failed:', e)
     }
   }
 

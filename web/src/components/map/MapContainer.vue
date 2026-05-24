@@ -271,7 +271,7 @@ async function drawRouteShape(routeId: string) {
 // Color per transit vehicle type — matches VehicleMarker colors
 function stepColor(step: google.maps.DirectionsStep): string {
   if (step.travel_mode !== 'TRANSIT' || !step.transit) return '#3b82f6' // walking — blue
-  switch (step.transit.line?.vehicle?.type) {
+  switch (step.transit.line?.vehicle?.type as string) {
     case 'SUBWAY':                          return '#a855f7' // purple
     case 'HEAVY_RAIL':
     case 'COMMUTER_TRAIN':                  return '#f59e0b' // amber

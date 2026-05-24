@@ -1,7 +1,9 @@
 import axios from 'axios'
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+// In dev mode VITE_API_BASE_URL is intentionally empty so requests go through
+// the Vite proxy (/api → localhost:8080), avoiding cross-origin issues.
+// In production the env var is set to the full server URL.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 
 const api = axios.create({
   baseURL: `${API_BASE_URL}/api/v1`,
