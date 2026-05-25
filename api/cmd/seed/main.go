@@ -18,6 +18,8 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"soundsync/api/internal/config"
+	"soundsync/api/internal/models"
+	"soundsync/api/internal/repository"
 )
 
 // OBA-format route IDs (agency prefix + numeric ID) — matches what the poller stores
@@ -133,6 +135,9 @@ func main() {
 		seedReports(ctx, rng, uid, cleanCol, crowdCol, delayCol, reportsCol)
 	}
 	log.Printf("MongoDB done. Created: %d, Skipped: %d", created, skipped)
+
+	// ── Team members ─────────────────────────────────────────────────────────
+	seedTeam(ctx, db)
 
 	// ── PostgreSQL arrivals ──────────────────────────────────────────────────
 	dsn := fmt.Sprintf(
@@ -289,6 +294,59 @@ func insertReport(
 	}
 	if _, err := reportsCol.InsertOne(ctx, doc); err != nil {
 		log.Printf("    report insert error: %v", err)
+	}
+}
+
+func seedTeam(ctx context.Context, db *mongo.Database) {
+	repo := repository.NewTeamRepo(db)
+	members := []models.TeamMember{
+		{
+			Name:      "Abshira",
+			Pronouns:  "she/her",
+			Role:      "UI Front End & Mobile",
+			PhotoURL:  "https://soundsync.live/team/abshira.jpg",
+			Quote:     "Add your personal quote here.",
+			LinkedIn:  "https://www.linkedin.com/in/abshira-salat-ba1829260/",
+			GitHub:    "https://github.com/AbshiraSalat",
+			SortOrder: 1,
+		},
+		{
+			Name:      "Tony",
+			Pronouns:  "he/him",
+			Role:      "System DevOps, Auth & Security",
+			PhotoURL:  "https://soundsync.live/team/tony.jpg",
+			Quote:     "Add your personal quote here.",
+			LinkedIn:  "https://www.linkedin.com/in/anye-che-b59624202/",
+			GitHub:    "https://github.com/cheTonyA",
+			SortOrder: 2,
+		},
+		{
+			Name:      "Nolan",
+			Pronouns:  "he/him",
+			Role:      "Performance Metrics & AI Prediction",
+			PhotoURL:  "https://soundsync.live/team/nolan.jpg",
+			Quote:     "Add your personal quote here.",
+			LinkedIn:  "https://www.linkedin.com/in/nolan-ngo-2b3304203/",
+			GitHub:    "https://github.com/nolngo",
+			SortOrder: 3,
+		},
+		{
+			Name:      "Wayne",
+			Pronouns:  "he/him",
+			Role:      "Backend, Testing & API Management",
+			PhotoURL:  "https://soundsync.live/team/wayne.jpg",
+			Quote:     "Add your personal quote here.",
+			LinkedIn:  "https://www.linkedin.com/in/thu-san/",
+			GitHub:    "https://github.com/waynesan41",
+			SortOrder: 4,
+		},
+	}
+	for _, m := range members {
+		if err := repo.Upsert(ctx, m); err != nil {
+			log.Printf("  team upsert error (%s): %v", m.Name, err)
+		} else {
+			log.Printf("  upserted team member: %s", m.Name)
+		}
 	}
 }
 

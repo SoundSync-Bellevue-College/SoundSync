@@ -41,11 +41,11 @@ class GeocodingService {
         'components': 'country:us',
       });
 
-      // Log full response for debugging
-      debugPrint('[Places] status=${resp.data['status']} '
-          'error=${resp.data['error_message']}');
+      final status = resp.data['status'] as String? ?? 'NO_STATUS';
+      final errorMsg = resp.data['error_message'] as String? ?? '';
+      debugPrint('[Places] key_len=${_mapsApiKey.length} status=$status error=$errorMsg');
 
-      if (resp.data['status'] != 'OK') return [];
+      if (status != 'OK') return [];
 
       final predictions = resp.data['predictions'] as List<dynamic>;
       return predictions.map((p) {
