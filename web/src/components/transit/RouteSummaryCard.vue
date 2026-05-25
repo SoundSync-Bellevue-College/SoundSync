@@ -148,7 +148,7 @@ const fareBreakdown = computed(() => {
   for (const leg of route.legs) {
     for (const step of leg.steps) {
       if (step.travel_mode !== 'TRANSIT' || !step.transit) continue
-      const type = step.transit.line?.vehicle?.type ?? 'BUS'
+      const type = (step.transit.line?.vehicle?.type ?? 'BUS') as string
       const rate = FARE[type] ?? 2.75
       if (type === 'FERRY') ferryCost += rate
       else if (type === 'HEAVY_RAIL' || type === 'COMMUTER_TRAIN') railCost += rate

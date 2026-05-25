@@ -42,19 +42,34 @@
           <!-- Level selector -->
           <div class="level-section">
             <p class="level-question">{{ currentType.question }}</p>
-            <div class="level-row">
+
+            <!-- Delay: minute-based options -->
+            <div v-if="activeType === 'delay'" class="level-row delay-row">
               <button
-                v-for="n in 5"
-                :key="n"
-                class="level-btn"
-                :class="{ selected: selectedLevel === n }"
-                @click="selectedLevel = n"
-              >{{ n }}</button>
+                v-for="opt in delayOptions"
+                :key="opt.level"
+                class="level-btn delay-btn"
+                :class="{ selected: selectedLevel === opt.level }"
+                @click="selectedLevel = opt.level"
+              >{{ opt.label }}</button>
             </div>
-            <div class="level-labels">
-              <span>{{ currentType.labelLow }}</span>
-              <span>{{ currentType.labelHigh }}</span>
-            </div>
+
+            <!-- Cleanliness / Crowding: 1–5 scale -->
+            <template v-else>
+              <div class="level-row">
+                <button
+                  v-for="n in 5"
+                  :key="n"
+                  class="level-btn"
+                  :class="{ selected: selectedLevel === n }"
+                  @click="selectedLevel = n"
+                >{{ n }}</button>
+              </div>
+              <div class="level-labels">
+                <span>{{ currentType.labelLow }}</span>
+                <span>{{ currentType.labelHigh }}</span>
+              </div>
+            </template>
           </div>
 
           <!-- Success message -->
@@ -134,6 +149,14 @@ const reportTypes: Array<{
     labelLow: '1 — On time',
     labelHigh: '5 — Very delayed',
   },
+]
+
+const delayOptions = [
+  { level: 1, label: '1+ min' },
+  { level: 2, label: '3+ min' },
+  { level: 3, label: '5+ min' },
+  { level: 4, label: '10+ min' },
+  { level: 5, label: '20+ min' },
 ]
 
 const activeType = ref<ReportTypeKey>('cleanliness')
@@ -315,6 +338,17 @@ async function submit() {
   justify-content: space-between;
   font-size: 0.68rem;
   color: var(--color-text-muted);
+}
+
+.delay-row {
+  flex-wrap: wrap;
+}
+
+.delay-btn {
+  aspect-ratio: unset;
+  flex: 1 1 auto;
+  padding: 0.5rem 0.25rem;
+  font-size: 0.82rem;
 }
 
 /* ── Messages ── */

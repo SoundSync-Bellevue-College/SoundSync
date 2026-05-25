@@ -48,6 +48,7 @@ html,
 body,
 #app-root {
   height: 100%;
+  overflow-x: hidden;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background-color: #0f172a;
   color: #f1f5f9;
