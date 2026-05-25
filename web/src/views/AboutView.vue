@@ -102,6 +102,9 @@
     <!-- Footer note -->
     <section class="footer-note">
       <p>Built with ❤️ at <strong>Bellevue College</strong> · King County, WA</p>
+      <p class="footer-links">
+        <RouterLink to="/privacy" class="footer-link">Privacy Policy</RouterLink>
+      </p>
     </section>
 
   </div>
@@ -407,6 +410,26 @@ const team = [
   padding-top: 1rem;
   padding-bottom: 3rem;
   border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.footer-links {
+  display: flex;
+  justify-content: center;
+  gap: 1.25rem;
+}
+
+.footer-link {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.footer-link:hover {
+  color: var(--color-primary);
 }
 
 /* ── Tablet (≤ 900px) ────────────────────────────────────────────────────── */

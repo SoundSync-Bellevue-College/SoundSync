@@ -40,6 +40,10 @@
         Already have an account?
         <RouterLink to="/login">Sign in</RouterLink>
       </p>
+      <p class="auth-privacy">
+        By creating an account you agree to our
+        <RouterLink to="/privacy">Privacy Policy</RouterLink>.
+      </p>
     </div>
   </div>
 </template>
@@ -166,6 +170,13 @@ async function submit() {
   text-align: center;
   margin-top: 1.25rem;
   font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.auth-privacy {
+  text-align: center;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
   color: var(--color-text-muted);
 }
 </style>
