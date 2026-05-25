@@ -38,6 +38,7 @@ func New(cfg *config.Config, db *mongo.Database, pgDB *sql.DB) http.Handler {
 	reportRepo := repository.NewReportRepo(db)
 	vehicleReportRepo := repository.NewVehicleReportRepo(db)
 	notifRepo := repository.NewNotificationRepo(db)
+	teamRepo := repository.NewTeamRepo(db)
 
 	authSvc := services.NewAuthService(userRepo, cfg.JWTSecret)
 	transitSvc := services.NewTransitService(cfg)
@@ -56,6 +57,7 @@ func New(cfg *config.Config, db *mongo.Database, pgDB *sql.DB) http.Handler {
 	vehicleReportH := handlers.NewVehicleReportHandler(vehicleReportRepo)
 	reliabilityH := handlers.NewReliabilityHandler(reliabilitySvc)
 	serviceAlertsH := handlers.NewServiceAlertsHandler(serviceAlertsSvc)
+	teamH := handlers.NewTeamHandler(teamRepo)
 
 	// JWT middleware factory
 	jwtAuth := middleware.NewJWTAuth(cfg.JWTSecret)
@@ -85,6 +87,9 @@ func New(cfg *config.Config, db *mongo.Database, pgDB *sql.DB) http.Handler {
 
 		// Service alerts (public)
 		r.Get("/service-alerts", serviceAlertsH.GetAlerts)
+
+		// Team (public)
+		r.Get("/team", teamH.GetTeam)
 		// Crowd-sourced ratings (public)
 		r.Get("/crowdsource/summary", vehicleReportH.GetCrowdSourceSummary)
 

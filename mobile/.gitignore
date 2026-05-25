@@ -46,3 +46,4 @@ app.*.map.json
 
 # Flutter API key definitions — contains secrets, never commit
 dart_defines.env
+dart_defines.json

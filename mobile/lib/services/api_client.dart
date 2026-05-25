@@ -5,7 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 // Physical device & iOS simulator: use Mac's LAN IP (see dart_defines.env)
 const _baseUrl = String.fromEnvironment(
   'API_BASE_URL',
-  defaultValue: 'http://10.0.0.173:8080/api/v1',
+  defaultValue: 'https://soundsync.live/api/v1',
 );
 const _storage = FlutterSecureStorage();
 
