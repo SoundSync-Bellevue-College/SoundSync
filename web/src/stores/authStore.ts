@@ -21,14 +21,22 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.setItem(USER_KEY, JSON.stringify(newUser))
   }
 
+  function assertAuthResponse(response: { token?: unknown; user?: unknown }) {
+    if (typeof response.token !== 'string' || !response.token || !response.user) {
+      throw new Error('Invalid login response from server')
+    }
+  }
+
   async function login(payload: LoginPayload) {
     const response = await authService.login(payload)
+    assertAuthResponse(response)
     persist(response.token, response.user)
     return response.user
   }
 
   async function register(payload: RegisterPayload) {
     const response = await authService.register(payload)
+    assertAuthResponse(response)
     persist(response.token, response.user)
     return response.user
   }

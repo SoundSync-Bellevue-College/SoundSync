@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "vue-tsc && vite build",
     "preview": "vite preview",
+    "test:e2e": "playwright test",
+    "test:e2e:real-api": "wait-on http://localhost:8080/health && cross-env E2E_USE_REAL_API=1 playwright test",
     "lint": "eslint . --ext .vue,.ts,.tsx --fix"
   },
   "dependencies": {
@@ -17,11 +19,14 @@
     "vue-router": "^4.3.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@types/google.maps": "^3.55.9",
     "@types/node": "^20.14.9",
     "@vitejs/plugin-vue": "^5.0.5",
+    "cross-env": "^10.1.0",
     "typescript": "^5.2.2",
     "vite": "^5.3.1",
-    "vue-tsc": "^2.0.21"
+    "vue-tsc": "^2.0.21",
+    "wait-on": "^9.0.10"
   }
 }
