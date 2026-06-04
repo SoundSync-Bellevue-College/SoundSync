@@ -51,42 +51,172 @@ func (s *TransitService) GetVehicles(ctx context.Context) ([]models.VehiclePosit
 		vehicles = devMockVehicles()
 	}
 
-	s.vehicles = vehicles
+	s.vehicles = deduplicateVehicles(vehicles)
 	s.lastFetched = time.Now()
 	return s.vehicles, nil
 }
 
+// railRouteIDs maps known Sound Transit rail/streetcar/ferry route IDs to their type.
+// Route IDs here are the short form used after stripping the agency prefix from OBA trip IDs.
+var railRouteIDs = map[string]string{
+	// Link Light Rail
+	"1 Line": "RAIL", "2 Line": "RAIL",
+	"1_Line": "RAIL", "2_Line": "RAIL",
+	"599": "RAIL", "100479": "RAIL",
+	// Sounder commuter rail
+	"Sounder-North": "RAIL", "Sounder-South": "RAIL",
+	"Sounder_N": "RAIL", "Sounder_S": "RAIL",
+	// Seattle Streetcar
+	"100340": "STREETCAR", "102638": "STREETCAR",
+	// King County Water Taxi
+	"100336": "FERRY", "100337": "FERRY",
+}
+
+// routeTypeFor returns a human-readable vehicle category for a given routeID.
+func routeTypeFor(routeID string) string {
+	if t, ok := railRouteIDs[routeID]; ok {
+		return t
+	}
+	return "BUS"
+}
+
 // loadVehicles tries data sources in order: GTFS-RT → OBA REST → empty.
 func (s *TransitService) loadVehicles(ctx context.Context) ([]models.VehiclePosition, error) {
-	// ── 1. GTFS-RT feed ──────────────────────────────────────────────────────
+	var buses, rail []models.VehiclePosition
+
+	// ── 1. KCM GTFS-RT feed (buses) ──────────────────────────────────────────
 	if s.cfg.GTFSVehicleURL != "" {
-		vehicles, err := s.fetchFromGTFS(ctx)
+		v, err := s.fetchFromGTFS(ctx, s.cfg.GTFSVehicleURL)
 		if err != nil {
-			log.Printf("GTFS-RT feed error: %v", err)
-		} else if len(vehicles) > 0 {
-			log.Printf("Loaded %d vehicles from GTFS-RT", len(vehicles))
-			return vehicles, nil
+			log.Printf("KCM GTFS-RT feed error: %v", err)
+		} else {
+			tagRouteTypes(v)
+			log.Printf("Loaded %d vehicles from KCM GTFS-RT", len(v))
+			buses = v
 		}
 	}
 
-	// ── 2. OneBusAway REST API ────────────────────────────────────────────────
-	vehicles, err := s.fetchFromOBA(ctx)
-	if err != nil {
-		log.Printf("OBA API error: %v", err)
-		return nil, err
+	// ── 2. Sound Transit GTFS-RT feed (rail + ST express) ────────────────────
+	if s.cfg.GTFSRailVehicleURL != "" {
+		v, err := s.fetchFromGTFS(ctx, s.cfg.GTFSRailVehicleURL)
+		if err != nil {
+			log.Printf("ST GTFS-RT feed error: %v", err)
+		} else {
+			tagRouteTypes(v)
+			log.Printf("Loaded %d vehicles from ST GTFS-RT", len(v))
+			rail = v
+		}
 	}
-	log.Printf("Loaded %d vehicles from OBA", len(vehicles))
-	return vehicles, nil
+
+	// ── 3. OBA REST API fallback ──────────────────────────────────────────────
+	if len(buses) == 0 && len(rail) == 0 {
+		v, err := s.fetchFromOBA(ctx)
+		if err != nil {
+			log.Printf("OBA API error: %v", err)
+			return nil, err
+		}
+		tagRouteTypes(v)
+		log.Printf("Loaded %d vehicles from OBA", len(v))
+		return v, nil
+	}
+
+	combined := make([]models.VehiclePosition, 0, len(buses)+len(rail))
+	combined = append(combined, buses...)
+	combined = append(combined, rail...)
+
+	// ── 4. Washington State Ferries (always appended when available) ──────────
+	ferries, err := s.fetchFromWSF(ctx)
+	if err != nil {
+		log.Printf("WSF ferry fetch error: %v", err)
+	} else {
+		log.Printf("Loaded %d vessels from WSF", len(ferries))
+		combined = append(combined, ferries...)
+	}
+
+	return combined, nil
 }
 
-// fetchFromGTFS downloads and parses the GTFS-RT vehicle positions feed.
-func (s *TransitService) fetchFromGTFS(ctx context.Context) ([]models.VehiclePosition, error) {
-	data, err := fetchFeed(ctx, s.cfg.GTFSVehicleURL)
+// wsfVesselLocation mirrors the WSDOT Ferries API vessel location JSON.
+type wsfVesselLocation struct {
+	VesselID             int     `json:"VesselID"`
+	VesselName           string  `json:"VesselName"`
+	Lat                  float64 `json:"Lat"`
+	Lon                  float64 `json:"Lon"`
+	Heading              float64 `json:"Heading"`
+	Speed                float64 `json:"Speed"`
+	InService            bool    `json:"InService"`
+	AtDock               bool    `json:"AtDock"`
+	DepartingTerminalName string `json:"DepartingTerminalName"`
+	ArrivingTerminalName  string `json:"ArrivingTerminalName"`
+}
+
+// fetchFromWSF fetches live vessel positions from the WSDOT Ferries API.
+// No API key is required; WSF_API_KEY in .env provides an optional access code.
+func (s *TransitService) fetchFromWSF(ctx context.Context) ([]models.VehiclePosition, error) {
+	url := "https://www.wsdot.wa.gov/ferries/api/vessels/rest/vessellocations"
+	if s.cfg.WSFApiKey != "" {
+		url += "?apiaccesscode=" + s.cfg.WSFApiKey
+	}
+
+	data, err := fetchFeed(ctx, url)
+	if err != nil {
+		return nil, fmt.Errorf("WSF vessel locations: %w", err)
+	}
+
+	var vessels []wsfVesselLocation
+	if err := json.Unmarshal(data, &vessels); err != nil {
+		return nil, fmt.Errorf("decode WSF response: %w", err)
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	result := make([]models.VehiclePosition, 0, len(vessels))
+	for _, v := range vessels {
+		if !v.InService || v.Lat == 0 || v.Lon == 0 {
+			continue
+		}
+		result = append(result, models.VehiclePosition{
+			VehicleID: fmt.Sprintf("wsf-%s", v.VesselName),
+			RouteID:   "WSF",
+			TripID:    fmt.Sprintf("wsf-%d", v.VesselID),
+			Lat:       v.Lat,
+			Lng:       v.Lon,
+			Bearing:   float32(v.Heading),
+			Speed:     float32(v.Speed),
+			Timestamp: now,
+			RouteType: "FERRY",
+		})
+	}
+	return result, nil
+}
+
+// tagRouteTypes sets RouteType on each vehicle based on its RouteID.
+func tagRouteTypes(vehicles []models.VehiclePosition) {
+	for i := range vehicles {
+		vehicles[i].RouteType = routeTypeFor(vehicles[i].RouteID)
+	}
+}
+
+// deduplicateVehicles removes vehicles with duplicate VehicleIDs, keeping the first occurrence.
+func deduplicateVehicles(vehicles []models.VehiclePosition) []models.VehiclePosition {
+	seen := make(map[string]struct{}, len(vehicles))
+	out := vehicles[:0]
+	for _, v := range vehicles {
+		if _, dup := seen[v.VehicleID]; dup {
+			continue
+		}
+		seen[v.VehicleID] = struct{}{}
+		out = append(out, v)
+	}
+	return out
+}
+
+// fetchFromGTFS downloads and parses a GTFS-RT vehicle positions feed at the given URL.
+func (s *TransitService) fetchFromGTFS(ctx context.Context, url string) ([]models.VehiclePosition, error) {
+	data, err := fetchFeed(ctx, url)
 	if err != nil {
 		return nil, fmt.Errorf("download GTFS feed: %w", err)
 	}
 
-	url := s.cfg.GTFSVehicleURL
 	if strings.HasSuffix(url, ".json") {
 		feed, err := gtfs.ParseVehiclePositionsJSON(data)
 		if err != nil {
@@ -219,16 +349,27 @@ func (s *TransitService) fetchFromOBA(ctx context.Context) ([]models.VehiclePosi
 	return vehicles, nil
 }
 
-// devMockVehicles returns a small set of realistic Seattle-area vehicles
+// devMockVehicles returns a realistic set of Seattle-area vehicles (buses + rail)
 // used as a last resort when all live sources return nothing.
 func devMockVehicles() []models.VehiclePosition {
 	now := time.Now().UTC().Format(time.RFC3339)
 	return []models.VehiclePosition{
-		{VehicleID: "9301", RouteID: "100252", TripID: "mock-001", Lat: 47.6062, Lng: -122.3321, Bearing: 90, Speed: 14.5, Timestamp: now, OccupancyStatus: "MANY_SEATS_AVAILABLE"},
-		{VehicleID: "9302", RouteID: "100194", TripID: "mock-002", Lat: 47.6253, Lng: -122.3222, Bearing: 180, Speed: 10.2, Timestamp: now, OccupancyStatus: "FEW_SEATS_AVAILABLE"},
-		{VehicleID: "9303", RouteID: "100479", TripID: "mock-003", Lat: 47.5989, Lng: -122.3261, Bearing: 0, Speed: 22.0, Timestamp: now, OccupancyStatus: "STANDING_ROOM_ONLY"},
-		{VehicleID: "9304", RouteID: "100252", TripID: "mock-004", Lat: 47.6150, Lng: -122.3450, Bearing: 270, Speed: 12.0, Timestamp: now, OccupancyStatus: "MANY_SEATS_AVAILABLE"},
-		{VehicleID: "9305", RouteID: "100194", TripID: "mock-005", Lat: 47.6350, Lng: -122.3100, Bearing: 45, Speed: 8.0, Timestamp: now, OccupancyStatus: "MANY_SEATS_AVAILABLE"},
+		// KCM buses
+		{VehicleID: "9301", RouteID: "100252", TripID: "mock-001", Lat: 47.6062, Lng: -122.3321, Bearing: 90, Speed: 14.5, Timestamp: now, OccupancyStatus: "MANY_SEATS_AVAILABLE", RouteType: "BUS"},
+		{VehicleID: "9302", RouteID: "100194", TripID: "mock-002", Lat: 47.6253, Lng: -122.3222, Bearing: 180, Speed: 10.2, Timestamp: now, OccupancyStatus: "FEW_SEATS_AVAILABLE", RouteType: "BUS"},
+		{VehicleID: "9304", RouteID: "100252", TripID: "mock-004", Lat: 47.6150, Lng: -122.3450, Bearing: 270, Speed: 12.0, Timestamp: now, OccupancyStatus: "MANY_SEATS_AVAILABLE", RouteType: "BUS"},
+		{VehicleID: "9305", RouteID: "100194", TripID: "mock-005", Lat: 47.6350, Lng: -122.3100, Bearing: 45, Speed: 8.0, Timestamp: now, OccupancyStatus: "MANY_SEATS_AVAILABLE", RouteType: "BUS"},
+		// Link 1 Line — southbound through downtown toward Rainier Valley
+		{VehicleID: "L101", RouteID: "1 Line", TripID: "mock-L101", Lat: 47.6110, Lng: -122.3374, Bearing: 180, Speed: 35.0, Timestamp: now, OccupancyStatus: "MANY_SEATS_AVAILABLE", RouteType: "RAIL"},
+		{VehicleID: "L102", RouteID: "1 Line", TripID: "mock-L102", Lat: 47.5795, Lng: -122.3269, Bearing: 180, Speed: 40.0, Timestamp: now, OccupancyStatus: "FEW_SEATS_AVAILABLE", RouteType: "RAIL"},
+		// Link 1 Line — northbound toward UW / Northgate
+		{VehicleID: "L103", RouteID: "1 Line", TripID: "mock-L103", Lat: 47.6499, Lng: -122.3043, Bearing: 0, Speed: 38.0, Timestamp: now, OccupancyStatus: "STANDING_ROOM_ONLY", RouteType: "RAIL"},
+		{VehicleID: "L104", RouteID: "1 Line", TripID: "mock-L104", Lat: 47.7063, Lng: -122.3224, Bearing: 0, Speed: 42.0, Timestamp: now, OccupancyStatus: "MANY_SEATS_AVAILABLE", RouteType: "RAIL"},
+		// Link 2 Line — eastbound to Bellevue/Redmond
+		{VehicleID: "L201", RouteID: "2 Line", TripID: "mock-L201", Lat: 47.5980, Lng: -122.3280, Bearing: 90, Speed: 36.0, Timestamp: now, OccupancyStatus: "FEW_SEATS_AVAILABLE", RouteType: "RAIL"},
+		{VehicleID: "L202", RouteID: "2 Line", TripID: "mock-L202", Lat: 47.6162, Lng: -122.1999, Bearing: 90, Speed: 44.0, Timestamp: now, OccupancyStatus: "MANY_SEATS_AVAILABLE", RouteType: "RAIL"},
+		// Link 2 Line — westbound back to Seattle
+		{VehicleID: "L203", RouteID: "2 Line", TripID: "mock-L203", Lat: 47.6193, Lng: -122.0989, Bearing: 270, Speed: 44.0, Timestamp: now, OccupancyStatus: "MANY_SEATS_AVAILABLE", RouteType: "RAIL"},
 	}
 }
 

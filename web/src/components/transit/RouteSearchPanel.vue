@@ -15,6 +15,15 @@
           autocomplete="off"
         />
       </div>
+      <button
+        class="current-location-chip"
+        :class="{ active: usingCurrentLocation, loading: locating }"
+        :disabled="locating"
+        @click="useCurrentLocation"
+      >
+        <span class="chip-dot">{{ locating ? '…' : '📍' }}</span>
+        {{ locating ? 'Detecting…' : 'Current location' }}
+      </button>
     </div>
 
     <!-- Swap button -->
@@ -32,6 +41,27 @@
           placeholder="Destination…"
           autocomplete="off"
         />
+        <button
+          v-if="auth.isLoggedIn && destPlace"
+          class="btn-heart"
+          :class="{ saved: destSaved, saving: savingDest }"
+          :title="destSaved ? 'Saved!' : 'Save location'"
+          :disabled="savingDest"
+          @click="saveDestination"
+        >{{ destSaved ? '♥' : '♡' }}</button>
+      </div>
+
+      <!-- Saved location chips -->
+      <div v-if="auth.isLoggedIn && savedLocations.length" class="saved-chips">
+        <button
+          v-for="loc in savedLocations"
+          :key="loc._id"
+          class="saved-chip"
+          :class="{ active: destPlace?.name === loc.destination.name }"
+          @click="applyFavoriteLocation(loc)"
+        >
+          ♥ {{ loc.label }}
+        </button>
       </div>
     </div>
 
@@ -98,6 +128,27 @@
       </label>
     </div>
 
+    <!-- Transit options -->
+    <div class="transit-options">
+      <div class="options-row">
+        <div class="options-col">
+          <div class="options-label">Prefer</div>
+          <label class="option-item" v-for="mode in transitModes" :key="mode.value">
+            <input type="checkbox" :value="mode.value" v-model="selectedModes" />
+            <span>{{ mode.label }}</span>
+          </label>
+        </div>
+        <div class="options-divider" />
+        <div class="options-col">
+          <div class="options-label">Routes</div>
+          <label class="option-item" v-for="pref in routePreferences" :key="pref.value">
+            <input type="radio" name="route-pref" :value="pref.value" v-model="selectedPreference" />
+            <span>{{ pref.label }}</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
     <button class="btn-plan" :disabled="isPlanning" @click="planRoute">
       <span v-if="isPlanning">Planning…</span>
       <span v-else>Get Directions</span>
@@ -132,6 +183,93 @@ const auth = useAuthStore()
 const isPlanning = ref(false)
 const locating = ref(false)
 const showDetail = ref(false)
+const usingCurrentLocation = ref(false)
+
+async function useCurrentLocation() {
+  if (!('geolocation' in navigator) || locating.value) return
+  locating.value = true
+  usingCurrentLocation.value = false
+
+  try {
+    const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+      navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000, maximumAge: 60000 })
+    )
+
+    const latlng = new google.maps.LatLng(pos.coords.latitude, pos.coords.longitude)
+
+    // Reverse geocode with type priority; skip plus-code-only results
+    let displayName = `${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`
+    try {
+      const { results } = await new google.maps.Geocoder().geocode({ location: latlng })
+      const TYPE_PRIORITY = ['street_address', 'route', 'neighborhood', 'sublocality_level_1', 'locality']
+      const isPlusCode = (addr: string) => /^[A-Z0-9]{4,8}\+[A-Z0-9]/.test(addr)
+
+      let best: google.maps.GeocoderResult | undefined
+      for (const type of TYPE_PRIORITY) {
+        best = results.find(r => r.types.includes(type) && !isPlusCode(r.formatted_address))
+        if (best) break
+      }
+      best ??= results.find(r => !isPlusCode(r.formatted_address)) ?? results[0]
+      if (best) displayName = best.formatted_address
+    } catch {
+      // Geocoding failed — fall back to coordinates as display name
+    }
+
+    if (originInputEl.value) originInputEl.value.value = displayName
+    originPlace = {
+      geometry: { location: latlng },
+      formatted_address: displayName,
+      name: displayName,
+    }
+    usingCurrentLocation.value = true
+  } catch {
+    // Geolocation denied or timed out — leave field empty
+  } finally {
+    locating.value = false
+  }
+}
+
+// Single-location favorites (origin.name is empty) available as quick-select chips
+const savedLocations = computed(() =>
+  routeStore.favorites.filter(f => !f.origin.name)
+)
+
+function applyFavoriteLocation(loc: (typeof routeStore.favorites)[number]) {
+  if (!destInputEl.value) return
+  destInputEl.value.value = loc.label
+  destPlace = {
+    name: loc.label,
+    geometry: { location: new google.maps.LatLng(loc.destination.lat, loc.destination.lng) },
+    formatted_address: loc.label,
+  }
+  destSaved.value = true
+}
+
+// ── Save destination location ─────────────────────────────────────────────────
+const destSaved = ref(false)
+const savingDest = ref(false)
+
+async function saveDestination() {
+  if (!destPlace?.geometry?.location) return
+  savingDest.value = true
+  try {
+    await routeStore.addFavorite({
+      label: destPlace.name || destInputEl.value?.value || 'Saved Location',
+      origin: { name: '', lat: 0, lng: 0 },
+      destination: {
+        name: destPlace.name || destInputEl.value?.value || '',
+        lat: destPlace.geometry.location.lat(),
+        lng: destPlace.geometry.location.lng(),
+      },
+      transitRouteIds: [],
+    })
+    destSaved.value = true
+  } catch {
+    // silently fail — heart stays empty so user can retry
+  } finally {
+    savingDest.value = false
+  }
+}
 
 const originInputEl = ref<HTMLInputElement | null>(null)
 const destInputEl = ref<HTMLInputElement | null>(null)
@@ -165,6 +303,24 @@ const selectedAmPm   = ref<'AM' | 'PM'>(initAmPm)
 
 const hours   = Array.from({ length: 12 }, (_, i) => String(i + 1))
 const minutes = ['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55']
+
+// ── Transit mode & route preference options ───────────────────────────────────
+
+const transitModes = [
+  { label: 'Bus',              value: 'BUS'    },
+  { label: 'Subway',           value: 'SUBWAY' },
+  { label: 'Train',            value: 'TRAIN'  },
+  { label: 'Tram & light rail',value: 'TRAM'   },
+]
+const selectedModes = ref(['BUS', 'SUBWAY', 'TRAIN', 'TRAM'])
+
+const routePreferences = [
+  { label: 'Best route',           value: 'BEST'             },
+  { label: 'Fewer transfers',      value: 'FEWER_TRANSFERS'  },
+  { label: 'Less walking',         value: 'LESS_WALKING'     },
+  { label: 'Wheelchair accessible',value: 'WHEELCHAIR'       },
+]
+const selectedPreference = ref('BEST')
 
 const dateInputEl = ref<HTMLInputElement | null>(null)
 
@@ -210,6 +366,7 @@ const AC_OPTIONS: google.maps.places.AutocompleteOptions = {
 
 onMounted(async () => {
   await loadGoogleMaps()
+  if (auth.isLoggedIn) routeStore.loadFavorites().catch(() => {})
 
   if (originInputEl.value) {
     originAC = new google.maps.places.Autocomplete(originInputEl.value, AC_OPTIONS)
@@ -218,37 +375,14 @@ onMounted(async () => {
 
   if (destInputEl.value) {
     destAC = new google.maps.places.Autocomplete(destInputEl.value, AC_OPTIONS)
-    destAC.addListener('place_changed', () => { destPlace = destAC!.getPlace() })
+    destAC.addListener('place_changed', () => {
+      destPlace = destAC!.getPlace()
+      destSaved.value = false
+    })
   }
 
-  // Pre-fill From with the user's current location if they haven't typed anything
-  if ('geolocation' in navigator) {
-    locating.value = true
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        locating.value = false
-        // Only fill in if the user hasn't typed anything yet
-        if (originInputEl.value?.value) return
-        const latlng = new google.maps.LatLng(pos.coords.latitude, pos.coords.longitude)
-        const geocoder = new google.maps.Geocoder()
-        geocoder.geocode({ location: latlng }, (results, status) => {
-          if (status !== 'OK' || !results?.length) return
-          // Skip pure plus-codes; prefer street-level results
-          const best = results.find(r => r.types.includes('street_address') || r.types.includes('premise')) ?? results[0]
-          if (originInputEl.value && !originInputEl.value.value) {
-            originInputEl.value.value = best.formatted_address
-            originPlace = {
-              geometry: { location: latlng },
-              formatted_address: best.formatted_address,
-              name: best.formatted_address,
-            }
-          }
-        })
-      },
-      () => { locating.value = false }, // permission denied or error — silently skip
-      { timeout: 8000, maximumAge: 60000 },
-    )
-  }
+  // Auto-fill From with current location on load
+  useCurrentLocation()
 })
 
 function swapPlaces() {
@@ -271,9 +405,26 @@ function planRoute() {
   routeStore.clearPlan()
 
   const transitTime = buildTransitTime()
+
+  const modeMap: Record<string, google.maps.TransitMode> = {
+    BUS:    google.maps.TransitMode.BUS,
+    SUBWAY: google.maps.TransitMode.SUBWAY,
+    TRAIN:  google.maps.TransitMode.TRAIN,
+    TRAM:   google.maps.TransitMode.TRAM,
+  }
+  const prefMap: Record<string, google.maps.TransitRoutePreference | undefined> = {
+    BEST:             undefined,
+    FEWER_TRANSFERS:  google.maps.TransitRoutePreference.FEWER_TRANSFERS,
+    LESS_WALKING:     google.maps.TransitRoutePreference.LESS_WALKING,
+    WHEELCHAIR:       undefined,
+  }
+
+  const modes = selectedModes.value.map(m => modeMap[m]).filter(Boolean) as google.maps.TransitMode[]
+  const routingPreference = prefMap[selectedPreference.value]
+
   const transitOptions: google.maps.TransitOptions = {
-    modes: [google.maps.TransitMode.BUS, google.maps.TransitMode.RAIL],
-    routingPreference: google.maps.TransitRoutePreference.FEWER_TRANSFERS,
+    ...(modes.length ? { modes } : {}),
+    ...(routingPreference !== undefined ? { routingPreference } : {}),
     ...(timeType.value === 'depart'
       ? { departureTime: transitTime }
       : { arrivalTime: transitTime }),
@@ -286,6 +437,7 @@ function planRoute() {
       destination: destPlace.geometry.location,
       travelMode: google.maps.TravelMode.TRANSIT,
       transitOptions,
+      provideRouteAlternatives: true,
       unitSystem: auth.distanceUnit === 'km'
         ? google.maps.UnitSystem.METRIC
         : google.maps.UnitSystem.IMPERIAL,
@@ -355,7 +507,7 @@ function planRoute() {
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  padding: 0.5rem 0.75rem 0.5rem 2rem;
+  padding: 0.5rem 2rem 0.5rem 2rem;
   color: var(--color-text);
   font-size: 0.875rem;
   transition: border-color 0.15s;
@@ -573,6 +725,159 @@ function planRoute() {
 
 .error-msg {
   font-size: 0.8rem;
+  color: var(--color-danger);
+}
+
+/* ── Transit options ─────────────────────────────────────────────────────── */
+
+.transit-options {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.75rem;
+}
+
+.options-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.options-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  flex: 1;
+}
+
+.options-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.1rem;
+}
+
+.options-divider {
+  width: 1px;
+  background: var(--color-border);
+  margin: 0 0.25rem;
+}
+
+.option-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--color-text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.option-item input[type='checkbox'],
+.option-item input[type='radio'] {
+  accent-color: var(--color-primary);
+  width: 13px;
+  height: 13px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* ── Current location chip ───────────────────────────────────────────────── */
+
+.current-location-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.current-location-chip:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.current-location-chip.active {
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.current-location-chip.loading {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.chip-dot { font-size: 0.8rem; line-height: 1; }
+
+/* ── Heart save button ────────────────────────────────────────────────────── */
+
+.btn-heart {
+  position: absolute;
+  right: 0.5rem;
+  background: none;
+  border: none;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 0.1rem;
+  transition: color 0.15s, transform 0.1s;
+}
+
+.btn-heart:hover {
+  color: var(--color-danger);
+}
+
+.btn-heart.saved {
+  color: var(--color-danger);
+}
+
+.btn-heart.saving {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Saved location chips ─────────────────────────────────────────────────── */
+
+.saved-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
+.saved-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.55rem;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+
+.saved-chip:hover {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.saved-chip.active {
+  background: color-mix(in srgb, var(--color-danger) 12%, transparent);
+  border-color: var(--color-danger);
   color: var(--color-danger);
 }
 </style>

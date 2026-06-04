@@ -250,7 +250,7 @@ function switchToReports() {
 }
 
 watch(activeTab, (tab) => {
-  if (tab === 'reports' && !reports.value.length && !loadingReports.value && !reportsError.value) {
+  if (tab === 'reports' && !reports.value.length && !loadingReports.value) {
     loadReports()
   }
 })

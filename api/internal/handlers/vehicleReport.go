@@ -12,6 +12,19 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+// GET /crowdsource/summary — public aggregated crowd-sourced ratings per route.
+func (h *VehicleReportHandler) GetCrowdSourceSummary(w http.ResponseWriter, r *http.Request) {
+	entries, err := h.repo.GetCrowdSourceSummary(r.Context())
+	if err != nil {
+		jsonError(w, "failed to load crowd source data", http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, map[string]interface{}{
+		"success": true,
+		"data":    map[string]interface{}{"routes": entries},
+	}, http.StatusOK)
+}
+
 // GET /users/me/vehicle-reports — returns all reports submitted by the caller.
 func (h *VehicleReportHandler) GetMyReports(w http.ResponseWriter, r *http.Request) {
 	userIDStr := middleware.GetUserID(r)

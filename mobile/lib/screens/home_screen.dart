@@ -16,6 +16,61 @@ import '../widgets/transit_route_sheet.dart';
 import '../widgets/weather_chip.dart';
 import '../widgets/vehicle_marker.dart';
 
+// ─── Favorites provider ───────────────────────────────────────────────────────
+
+class _FavoritePlace {
+  final String id;
+  final String label;
+  final String destName;
+  final double destLat;
+  final double destLng;
+
+  const _FavoritePlace({
+    required this.id,
+    required this.label,
+    required this.destName,
+    required this.destLat,
+    required this.destLng,
+  });
+}
+
+final _favoritesProvider = FutureProvider.autoDispose<List<_FavoritePlace>>((ref) async {
+  final dio = buildApiClient();
+  final res = await dio.get('/users/me/favorites');
+  final list = (res.data['favorites'] as List<dynamic>?) ?? [];
+  return list.map((e) {
+    final dest = e['destination'] as Map<String, dynamic>;
+    return _FavoritePlace(
+      id: (e['_id'] as String?) ?? '',
+      label: (e['label'] as String?) ?? '',
+      destName: (dest['name'] as String?) ?? '',
+      destLat: (dest['lat'] as num).toDouble(),
+      destLng: (dest['lng'] as num).toDouble(),
+    );
+  }).toList();
+});
+
+/// Returns a color for a transit polyline based on vehicle type.
+Color _transitColor(String? vehicleType) {
+  switch (vehicleType) {
+    case 'BUS':
+      return const Color(0xFFFF9800); // orange
+    case 'SUBWAY':
+    case 'HEAVY_RAIL':
+      return const Color(0xFF4CAF50); // green
+    case 'COMMUTER_TRAIN':
+    case 'RAIL':
+      return const Color(0xFF2196F3); // blue
+    case 'TRAM':
+    case 'LIGHT_RAIL':
+      return const Color(0xFF00BCD4); // teal
+    case 'FERRY':
+      return const Color(0xFF3F51B5); // indigo
+    default:
+      return const Color(0xFF7FDBFF); // cyan fallback
+  }
+}
+
 /// Decodes a Google Maps encoded polyline string into a list of [LatLng].
 List<LatLng> _decodePolyline(String encoded) {
   final result = <LatLng>[];
@@ -47,6 +102,8 @@ List<LatLng> _decodePolyline(String encoded) {
 }
 
 const _seattle = LatLng(47.6062, -122.3321);
+
+enum _BusMode { showAll, hideAll, routeOnly, custom }
 
 const _mapStyle = '''[
   {"elementType":"geometry","stylers":[{"color":"#0d1b2a"}]},
@@ -91,7 +148,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   List<PlaceSuggestion> _suggestions = [];
   bool _loadingSuggestions = false;
-  bool _showSuggestions = false;
   Map<String, dynamic>? _tappedVehicle; // {vehicleId, shortName, routeId}
   Marker? _destinationMarker;
   Timer? _debounce;
@@ -99,32 +155,92 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   double? _destLat;
   double? _destLng;
   TransitRoute? _activeRoute;
-  bool _navStepsExpanded = false;
-  bool _filterToRouteOnly = false;
+
+  // Origin (custom / searchable)
+  final TextEditingController _originCtrl = TextEditingController();
+  final FocusNode _originFocus = FocusNode();
+  List<PlaceSuggestion> _originSuggestions = [];
+  bool _loadingOriginSuggestions = false;
+  Timer? _originDebounce;
+  double? _originLat;
+  double? _originLng;
+  bool _originFieldActive = false;
+  bool _searchOverlayVisible = false;
   Set<String> _activeRouteShortNames = {};
   List<Map<String, dynamic>> _lastVehicles = [];
+  MapType _mapType = MapType.normal;
+  _BusMode _busMode = _BusMode.showAll;
+  String _customRoute = '';
 
   @override
   void initState() {
     super.initState();
     RoutesLookup.instance.load();
+    _originFocus.addListener(() {
+      if (mounted) setState(() => _originFieldActive = _originFocus.hasFocus);
+    });
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.light,
     ));
-    _searchFocus.addListener(() {
-      if (!_searchFocus.hasFocus) {
-        setState(() => _showSuggestions = false);
-      }
-    });
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
+    _originDebounce?.cancel();
     _searchCtrl.dispose();
     _searchFocus.dispose();
+    _originCtrl.dispose();
+    _originFocus.dispose();
     super.dispose();
+  }
+
+  void _onOriginChanged(String value) {
+    _originDebounce?.cancel();
+    if (value.trim().isEmpty) {
+      setState(() {
+        _originSuggestions = [];
+        _loadingOriginSuggestions = false;
+        _originLat = null;
+        _originLng = null;
+      });
+      return;
+    }
+    setState(() => _loadingOriginSuggestions = true);
+    _originDebounce = Timer(const Duration(milliseconds: 400), () async {
+      final results = await GeocodingService.autocomplete(value);
+      if (mounted) {
+        setState(() {
+          _originSuggestions = results;
+          _loadingOriginSuggestions = false;
+        });
+      }
+    });
+  }
+
+  Future<void> _selectOriginSuggestion(PlaceSuggestion s) async {
+    _originCtrl.text = s.mainText;
+    _originFocus.unfocus();
+    setState(() {
+      _originSuggestions = [];
+      _loadingOriginSuggestions = true;
+      _searchOverlayVisible = false;
+    });
+    final result = await GeocodingService.placeDetails(s.placeId);
+    if (!mounted) return;
+    setState(() {
+      _loadingOriginSuggestions = false;
+      if (result != null) {
+        _originLat = result.lat;
+        _originLng = result.lng;
+      }
+    });
+
+    // If a destination is already set, refresh the route with the new origin
+    if (result != null && _destLat != null && _destLng != null && _destName != null) {
+      _showRouteSheet(_destName!, _destLat!, _destLng!);
+    }
   }
 
   void _onSearchChanged(String value) {
@@ -132,7 +248,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (value.trim().isEmpty) {
       setState(() {
         _suggestions = [];
-        _showSuggestions = false;
+
         _loadingSuggestions = false;
       });
       return;
@@ -143,20 +259,41 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (mounted) {
         setState(() {
           _suggestions = results;
-          _showSuggestions = results.isNotEmpty;
           _loadingSuggestions = false;
         });
       }
     });
   }
 
+  void _selectFavorite(_FavoritePlace fav) {
+    _searchCtrl.text = fav.label;
+    _searchFocus.unfocus();
+    setState(() {
+      _suggestions = [];
+      _searchOverlayVisible = false;
+      _destName = fav.destName.isNotEmpty ? fav.destName : fav.label;
+      _destLat = fav.destLat;
+      _destLng = fav.destLng;
+    });
+    final dest = LatLng(fav.destLat, fav.destLng);
+    setState(() => _destinationMarker = Marker(
+          markerId: const MarkerId('__destination__'),
+          position: dest,
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+          infoWindow: InfoWindow(title: _destName),
+          onTap: () => _showRouteSheet(_destName!, _destLat!, _destLng!),
+        ));
+    _mapController?.animateCamera(CameraUpdate.newLatLngZoom(dest, 14));
+    _showRouteSheet(_destName!, fav.destLat, fav.destLng);
+  }
+
   Future<void> _selectSuggestion(PlaceSuggestion s) async {
     _searchCtrl.text = s.mainText;
     _searchFocus.unfocus();
     setState(() {
-      _showSuggestions = false;
       _suggestions = [];
       _loadingSuggestions = true;
+      _searchOverlayVisible = false;
     });
 
     final result = await GeocodingService.placeDetails(s.placeId);
@@ -186,8 +323,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Future<void> _showRouteSheet(
       String destName, double destLat, double destLng) async {
     final position = ref.read(locationProvider).valueOrNull;
-    final originLat = position?.latitude ?? 47.6062;
-    final originLng = position?.longitude ?? -122.3321;
+    final originLat = _originLat ?? position?.latitude ?? 47.6062;
+    final originLng = _originLng ?? position?.longitude ?? -122.3321;
 
     // Show loading sheet immediately
     if (!mounted) return;
@@ -211,6 +348,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       showModalBottomSheet(
         context: context,
         isScrollControlled: true,
+        isDismissible: false,
+        enableDrag: false,
         backgroundColor: Colors.transparent,
         builder: (_) => TransitRouteSheet(
           destinationName: destName,
@@ -259,7 +398,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           newPolylines.add(Polyline(
             polylineId: PolylineId('transit_$i'),
             points: points,
-            color: const Color(0xFF7FDBFF),
+            color: _transitColor(step.vehicleType),
             width: 5,
           ));
         }
@@ -323,9 +462,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (!mounted) return;
     setState(() {
       _activeRoute = route;
-      _navStepsExpanded = false;
       _activeRouteShortNames = shortNames;
-      _filterToRouteOnly = false;
+      if (_busMode == _BusMode.routeOnly) _busMode = _BusMode.showAll;
       _polylines..clear()..addAll(newPolylines);
       _stopMarkers..clear()..addAll(newStopMarkers);
     });
@@ -336,19 +474,36 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _activeRoute = null;
       _polylines.clear();
       _stopMarkers.clear();
-      _navStepsExpanded = false;
-      _filterToRouteOnly = false;
+      if (_busMode == _BusMode.routeOnly) _busMode = _BusMode.showAll;
       _activeRouteShortNames = {};
+    });
+  }
+
+  void _openSearch() {
+    setState(() => _searchOverlayVisible = true);
+    Future.microtask(() => _searchFocus.requestFocus());
+  }
+
+  void _closeSearch() {
+    _searchFocus.unfocus();
+    setState(() {
+      _searchOverlayVisible = false;
+      _suggestions = [];
     });
   }
 
   void _clearSearch() {
     _searchCtrl.clear();
+    _originCtrl.clear();
     _debounce?.cancel();
+    _originDebounce?.cancel();
     setState(() {
       _suggestions = [];
-      _showSuggestions = false;
       _loadingSuggestions = false;
+      _originSuggestions = [];
+      _loadingOriginSuggestions = false;
+      _originLat = null;
+      _originLng = null;
       _destinationMarker = null;
       _destName = null;
       _destLat = null;
@@ -356,70 +511,256 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _activeRoute = null;
       _polylines.clear();
       _stopMarkers.clear();
-      _navStepsExpanded = false;
-      _filterToRouteOnly = false;
+      if (_busMode == _BusMode.routeOnly) _busMode = _BusMode.showAll;
       _activeRouteShortNames = {};
+      _searchOverlayVisible = false;
     });
   }
 
   Future<void> _updateMarkers(List<Map<String, dynamic>> vehicles) async {
     _lastVehicles = vehicles;
     final newMarkers = <Marker>{};
-    for (final v in vehicles) {
-      final vehicleId = v['vehicleId'] as String;
-      final routeId = (v['routeId'] as String?) ?? '?';
-      final shortName = RoutesLookup.instance.shortName(routeId);
-      final lat = (v['lat'] as num).toDouble();
-      final lng = (v['lng'] as num).toDouble();
+    if (_busMode != _BusMode.hideAll) {
+      for (final v in vehicles) {
+        final vehicleId = v['vehicleId'] as String;
+        final routeId = (v['routeId'] as String?) ?? '?';
+        final shortName = RoutesLookup.instance.shortName(routeId);
+        final lat = (v['lat'] as num).toDouble();
+        final lng = (v['lng'] as num).toDouble();
 
-      // Skip vehicles not on the active route when filter is enabled
-      if (_filterToRouteOnly &&
-          _activeRouteShortNames.isNotEmpty &&
-          !_activeRouteShortNames.contains(shortName)) {
-        continue;
+        if (_busMode == _BusMode.routeOnly &&
+            _activeRouteShortNames.isNotEmpty &&
+            !_activeRouteShortNames.contains(shortName)) {
+          continue;
+        }
+        if (_busMode == _BusMode.custom &&
+            _customRoute.isNotEmpty &&
+            shortName.toLowerCase() != _customRoute.toLowerCase()) {
+          continue;
+        }
+
+        _iconCache[vehicleId] ??= await buildRouteMarker(shortName, vehicleId);
+
+        final capturedVehicle = {
+          'vehicleId': vehicleId,
+          'shortName': shortName,
+          'routeId': routeId,
+        };
+        newMarkers.add(Marker(
+          markerId: MarkerId(vehicleId),
+          position: LatLng(lat, lng),
+          icon: _iconCache[vehicleId]!,
+          onTap: () => setState(() => _tappedVehicle = capturedVehicle),
+        ));
       }
-
-      _iconCache[vehicleId] ??= await buildRouteMarker(shortName, vehicleId);
-
-      final capturedVehicle = {
-        'vehicleId': vehicleId,
-        'shortName': shortName,
-        'routeId': routeId,
-      };
-      newMarkers.add(Marker(
-        markerId: MarkerId(vehicleId),
-        position: LatLng(lat, lng),
-        icon: _iconCache[vehicleId]!,
-        onTap: () => setState(() => _tappedVehicle = capturedVehicle),
-      ));
     }
     if (_destinationMarker != null) newMarkers.add(_destinationMarker!);
     newMarkers.addAll(_stopMarkers);
     if (mounted) setState(() => _markers..clear()..addAll(newMarkers));
   }
 
-  void _showAccountMenu(BuildContext context, WidgetRef ref) {
-    final auth = ref.read(authProvider);
+  void _showMapTypePicker() {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => _AccountMenuSheet(
-        auth: auth,
-        onLogin: () {
-          Navigator.of(context).pop();
-          context.push('/login');
-        },
-        onRegister: () {
-          Navigator.of(context).pop();
-          context.push('/register');
-        },
-        onAccount: () {
-          Navigator.of(context).pop();
-          context.push('/account');
-        },
-        onLogout: () async {
-          Navigator.of(context).pop();
-          await ref.read(authProvider.notifier).logout();
+      builder: (_) => Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF0D1B2A),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const Text('Map Type',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            for (final option in [
+              (type: MapType.normal, label: 'Default', icon: Icons.map_outlined),
+              (type: MapType.satellite, label: 'Satellite', icon: Icons.satellite_alt_outlined),
+              (type: MapType.terrain, label: 'Terrain', icon: Icons.terrain_outlined),
+              (type: MapType.hybrid, label: 'Hybrid', icon: Icons.layers_outlined),
+            ])
+              InkWell(
+                onTap: () {
+                  setState(() => _mapType = option.type);
+                  Navigator.of(context).pop();
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                  child: Row(
+                    children: [
+                      Icon(option.icon,
+                          color: _mapType == option.type
+                              ? const Color(0xFF7FDBFF)
+                              : Colors.white54,
+                          size: 22),
+                      const SizedBox(width: 16),
+                      Text(option.label,
+                          style: TextStyle(
+                            color: _mapType == option.type
+                                ? const Color(0xFF7FDBFF)
+                                : Colors.white70,
+                            fontSize: 15,
+                            fontWeight: _mapType == option.type
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                          )),
+                      const Spacer(),
+                      if (_mapType == option.type)
+                        const Icon(Icons.check_circle,
+                            color: Color(0xFF7FDBFF), size: 18),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showBusPicker() {
+    final customCtrl = TextEditingController(text: _customRoute);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => StatefulBuilder(
+        builder: (context, setSheetState) {
+          void select(_BusMode mode) {
+            setState(() => _busMode = mode);
+            setSheetState(() {});
+            _updateMarkers(_lastVehicles);
+          }
+
+          return Padding(
+            padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom),
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Color(0xFF0D1B2A),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Handle
+                  Center(
+                    child: Container(
+                      width: 40, height: 4,
+                      margin: const EdgeInsets.only(bottom: 20),
+                      decoration: BoxDecoration(
+                          color: Colors.white24,
+                          borderRadius: BorderRadius.circular(2)),
+                    ),
+                  ),
+                  const Text('Bus Display',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+
+                  // Show all
+                  _BusRadioTile(
+                    label: 'Show all buses',
+                    subtitle: 'Display all live bus locations on the map',
+                    selected: _busMode == _BusMode.showAll,
+                    onTap: () => select(_BusMode.showAll),
+                  ),
+
+                  // Hide all
+                  _BusRadioTile(
+                    label: 'Hide all buses',
+                    subtitle: 'Remove all bus markers from the map',
+                    selected: _busMode == _BusMode.hideAll,
+                    onTap: () => select(_BusMode.hideAll),
+                  ),
+
+                  // Route only — only when navigating
+                  if (_activeRoute != null)
+                    _BusRadioTile(
+                      label: 'Show route buses only',
+                      subtitle: 'Only show buses on your active route',
+                      selected: _busMode == _BusMode.routeOnly,
+                      onTap: () => select(_BusMode.routeOnly),
+                    ),
+
+                  // Custom route
+                  _BusRadioTile(
+                    label: 'Track specific route',
+                    subtitle: 'Only show buses for a route number you choose',
+                    selected: _busMode == _BusMode.custom,
+                    onTap: () => select(_BusMode.custom),
+                  ),
+
+                  // Custom route input — shown when custom is selected
+                  if (_busMode == _BusMode.custom) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: customCtrl,
+                            autofocus: true,
+                            textCapitalization: TextCapitalization.characters,
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 15),
+                            decoration: InputDecoration(
+                              hintText: 'e.g. 372, 550, E Line',
+                              hintStyle: const TextStyle(
+                                  color: Colors.white38, fontSize: 14),
+                              filled: true,
+                              fillColor: const Color(0xFF122340),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 12),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide.none,
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                    color: Color(0xFF7FDBFF), width: 1.5),
+                              ),
+                            ),
+                            onChanged: (v) {
+                              setState(() => _customRoute = v.trim());
+                              setSheetState(() {});
+                              _updateMarkers(_lastVehicles);
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Filters live to buses matching this route name',
+                      style: TextStyle(color: Colors.white38, fontSize: 11),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          );
         },
       ),
     );
@@ -455,165 +796,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             initialCameraPosition: const CameraPosition(target: _seattle, zoom: 12),
             markers: _markers,
             polylines: _polylines,
-            mapType: MapType.normal,
+            mapType: _mapType,
             myLocationEnabled: hasLocation,
             myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
             onMapCreated: (c) {
               _mapController = c;
               c.setMapStyle(_mapStyle);
             },
             onTap: (_) {
-              _searchFocus.unfocus();
-              setState(() {
-                _showSuggestions = false;
-                _tappedVehicle = null;
-              });
+              if (_searchOverlayVisible) {
+                _closeSearch();
+              }
+              setState(() => _tappedVehicle = null);
             },
           ),
 
-          // Search bar
+          // Weather chip — below search bar, top-left
           Positioned(
-            top: topPad + 12,
+            top: topPad + 12 + 56 + 10,
             left: 16,
-            right: 68, // leave room for the profile button
-            child: Material(
-              elevation: 6,
-              borderRadius: BorderRadius.circular(28),
-              color: Colors.transparent,
-              child: TextField(
-                controller: _searchCtrl,
-                focusNode: _searchFocus,
-                style: const TextStyle(color: Colors.white, fontSize: 15),
-                decoration: InputDecoration(
-                  hintText: 'Search destination...',
-                  hintStyle: const TextStyle(color: Colors.white38),
-                  prefixIcon: _loadingSuggestions
-                      ? const Padding(
-                          padding: EdgeInsets.all(12),
-                          child: SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white54),
-                          ),
-                        )
-                      : const Icon(Icons.search, color: Colors.white54, size: 20),
-                  suffixIcon: _searchCtrl.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.close,
-                              color: Colors.white38, size: 18),
-                          onPressed: _clearSearch,
-                        )
-                      : null,
-                  filled: true,
-                  fillColor: const Color(0xE6122340),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(28),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-                onChanged: _onSearchChanged,
-                textInputAction: TextInputAction.search,
-                onSubmitted: (_) {
-                  if (_suggestions.isNotEmpty) _selectSuggestion(_suggestions.first);
-                },
-              ),
-            ),
-          ),
-
-          // Profile / account button (top-right, beside search bar)
-          Positioned(
-            top: topPad + 12,
-            right: 16,
-            child: _ProfileButton(
-              onTap: () => _showAccountMenu(context, ref),
-            ),
-          ),
-
-          // Autocomplete dropdown — separate Positioned so it's never clipped
-          if (_showSuggestions && _suggestions.isNotEmpty)
-            Positioned(
-              top: topPad + 12 + 52 + 6, // below search bar
-              left: 16,
-              right: 16,
-              child: Material(
-                elevation: 8,
-                borderRadius: BorderRadius.circular(16),
-                color: const Color(0xF2122340),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: _suggestions.asMap().entries.map((entry) {
-                      final i = entry.key;
-                      final s = entry.value;
-                      return Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          InkWell(
-                            onTap: () => _selectSuggestion(s),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 13),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.place_outlined,
-                                      color: Color(0xFF7FDBFF), size: 18),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          s.mainText,
-                                          style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w500),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        if (s.secondaryText.isNotEmpty)
-                                          Text(
-                                            s.secondaryText,
-                                            style: const TextStyle(
-                                                color: Colors.white38,
-                                                fontSize: 12),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          if (i < _suggestions.length - 1)
-                            const Divider(height: 1, color: Colors.white10),
-                        ],
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ),
-            ),
-
-          // Weather chip — below search bar, left-aligned
-          Positioned(
-            top: topPad + 12 + 52 + 10,
-            left: 16,
-            child: (_showSuggestions || _tappedVehicle != null)
+            child: _tappedVehicle != null || _searchOverlayVisible || _activeRoute != null
                 ? const SizedBox.shrink()
                 : const WeatherChip(),
           ),
 
           // Vehicle info card — shown when a bus marker is tapped
-          if (_tappedVehicle != null && !_showSuggestions)
+          if (_tappedVehicle != null && !_searchOverlayVisible)
             Positioned(
-              top: topPad + 12 + 52 + 10,
+              top: topPad + 12 + 56 + 10,
               left: 16,
               right: 16,
               child: _VehicleInfoCard(
@@ -637,47 +848,542 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
 
-          // Active navigation panel
+          // Active navigation panel — draggable sheet
           if (_activeRoute != null)
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: _ActiveRoutePanel(
-                route: _activeRoute!,
-                destName: _destName ?? 'Destination',
-                expanded: _navStepsExpanded,
-                filterActive: _filterToRouteOnly,
-                onToggleExpand: () =>
-                    setState(() => _navStepsExpanded = !_navStepsExpanded),
-                onToggleFilter: () {
-                  setState(() => _filterToRouteOnly = !_filterToRouteOnly);
-                  _updateMarkers(_lastVehicles);
-                },
-                onCancel: _cancelNavigation,
+            Positioned.fill(
+              child: DraggableScrollableSheet(
+                initialChildSize: 0.22,
+                minChildSize: 0.18,
+                maxChildSize: 0.78,
+                snap: true,
+                snapSizes: const [0.22, 0.78],
+                builder: (context, scrollController) => _ActiveRoutePanel(
+                  route: _activeRoute!,
+                  destName: _destName ?? 'Destination',
+                  scrollController: scrollController,
+                  onCancel: _cancelNavigation,
+                ),
               ),
             ),
 
-          // Map controls — zoom + my location (top-right, below profile button)
-          Positioned(
-            top: topPad + 12 + 52 + 10,
+          // Top search card (Google Maps style — idle state)
+          if (!_searchOverlayVisible && _activeRoute == null)
+            Positioned(
+              top: topPad + 12,
+              left: 16,
+              right: 16,
+              child: GestureDetector(
+                onTap: _openSearch,
+                child: Container(
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0D1B2A),
+                    borderRadius: BorderRadius.circular(28),
+                    boxShadow: const [
+                      BoxShadow(
+                          color: Colors.black54,
+                          blurRadius: 16,
+                          offset: Offset(0, 4)),
+                    ],
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.search,
+                          color: Color(0xFF7FDBFF), size: 22),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _destName != null
+                              ? _destName!
+                              : 'Search destination...',
+                          style: TextStyle(
+                            color: _destName != null
+                                ? Colors.white
+                                : Colors.white38,
+                            fontSize: 15,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (_destName != null)
+                        GestureDetector(
+                          onTap: _clearSearch,
+                          behavior: HitTestBehavior.opaque,
+                          child: const Padding(
+                            padding: EdgeInsets.only(left: 8),
+                            child: Icon(Icons.close,
+                                color: Colors.white38, size: 18),
+                          ),
+                        )
+                      else
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF122340),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Icon(Icons.directions_transit,
+                              color: Color(0xFF7FDBFF), size: 16),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+          // Full-screen search overlay (Google Maps style)
+          if (_searchOverlayVisible)
+            Positioned.fill(
+              child: Material(
+                color: const Color(0xFF0D1B2A),
+                child: Column(
+                  children: [
+                    // Input section
+                    Container(
+                      color: const Color(0xFF0D1B2A),
+                      child: SafeArea(
+                        bottom: false,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(4, 8, 16, 16),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              // Back button
+                              IconButton(
+                                icon: const Icon(Icons.arrow_back,
+                                    color: Colors.white),
+                                onPressed: _closeSearch,
+                              ),
+                              // Input fields with connecting line
+                              Expanded(
+                                child: Column(
+                                  children: [
+                                    // Origin row
+                                    Container(
+                                      height: 52,
+                                      decoration: BoxDecoration(
+                                        color: _originFieldActive
+                                            ? const Color(0xFF1A3A5C)
+                                            : const Color(0xFF122340),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: _originFieldActive
+                                            ? Border.all(
+                                                color: const Color(0xFF7FDBFF)
+                                                    .withOpacity(0.5))
+                                            : null,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 14),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 10,
+                                            height: 10,
+                                            decoration: const BoxDecoration(
+                                              color: Color(0xFF7FDBFF),
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: TextField(
+                                              controller: _originCtrl,
+                                              focusNode: _originFocus,
+                                              style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 14),
+                                              decoration: const InputDecoration(
+                                                hintText: 'Your location',
+                                                hintStyle: TextStyle(
+                                                    color: Colors.white54),
+                                                border: InputBorder.none,
+                                                isDense: true,
+                                                contentPadding: EdgeInsets.symmetric(vertical: 8),
+                                              ),
+                                              onChanged: _onOriginChanged,
+                                              textInputAction:
+                                                  TextInputAction.search,
+                                              onSubmitted: (_) {
+                                                if (_originSuggestions
+                                                    .isNotEmpty) {
+                                                  _selectOriginSuggestion(
+                                                      _originSuggestions.first);
+                                                }
+                                              },
+                                            ),
+                                          ),
+                                          if (_loadingOriginSuggestions)
+                                            const SizedBox(
+                                              width: 16,
+                                              height: 16,
+                                              child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  color: Colors.white38),
+                                            )
+                                          else if (_originCtrl.text.isNotEmpty)
+                                            GestureDetector(
+                                              onTap: () {
+                                                _originCtrl.clear();
+                                                setState(() {
+                                                  _originSuggestions = [];
+                                                  _originLat = null;
+                                                  _originLng = null;
+                                                });
+                                              },
+                                              child: const Icon(Icons.close,
+                                                  color: Colors.white38,
+                                                  size: 18),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                    // Connector line
+                                    Row(
+                                      children: [
+                                        const SizedBox(width: 18),
+                                        Container(
+                                            width: 1.5,
+                                            height: 10,
+                                            color: Colors.white24),
+                                      ],
+                                    ),
+                                    // Destination field
+                                    Container(
+                                      height: 52,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF1A3A5C),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                            color: const Color(0xFF7FDBFF)
+                                                .withOpacity(0.5)),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 14),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 10,
+                                            height: 10,
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                  color:
+                                                      const Color(0xFF7FDBFF),
+                                                  width: 2),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: TextField(
+                                              controller: _searchCtrl,
+                                              focusNode: _searchFocus,
+                                              style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 14),
+                                              decoration: const InputDecoration(
+                                                hintText: 'Search destination',
+                                                hintStyle: TextStyle(
+                                                    color: Colors.white38),
+                                                border: InputBorder.none,
+                                                isDense: true,
+                                                contentPadding: EdgeInsets.symmetric(vertical: 8),
+                                              ),
+                                              onChanged: _onSearchChanged,
+                                              textInputAction:
+                                                  TextInputAction.search,
+                                              onSubmitted: (_) {
+                                                if (_suggestions.isNotEmpty) {
+                                                  _selectSuggestion(
+                                                      _suggestions.first);
+                                                }
+                                              },
+                                            ),
+                                          ),
+                                          if (_loadingSuggestions)
+                                            const SizedBox(
+                                              width: 16,
+                                              height: 16,
+                                              child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  color: Colors.white38),
+                                            )
+                                          else if (_searchCtrl.text.isNotEmpty)
+                                            GestureDetector(
+                                              onTap: () {
+                                                _searchCtrl.clear();
+                                                setState(() {
+                                                  _suggestions = [];
+                                          
+                                                });
+                                              },
+                                              child: const Icon(Icons.close,
+                                                  color: Colors.white38,
+                                                  size: 18),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const Divider(height: 1, color: Colors.white10),
+                    // Suggestions list
+                    Expanded(
+                      child: Builder(builder: (context) {
+                        final activeSuggestions = _originFieldActive
+                            ? _originSuggestions
+                            : _suggestions;
+                        final isLoading = _originFieldActive
+                            ? _loadingOriginSuggestions
+                            : _loadingSuggestions;
+                        final isLoggedIn = ref.watch(authProvider).isLoggedIn;
+                        final showFavorites = activeSuggestions.isEmpty &&
+                            !isLoading &&
+                            !_originFieldActive &&
+                            isLoggedIn;
+
+                        if (showFavorites) {
+                          final favAsync = ref.watch(_favoritesProvider);
+                          return favAsync.when(
+                            loading: () => const Center(
+                              child: Padding(
+                                padding: EdgeInsets.only(top: 40),
+                                child: CircularProgressIndicator(
+                                    color: Color(0xFF7FDBFF), strokeWidth: 2),
+                              ),
+                            ),
+                            error: (_, __) => const Padding(
+                              padding: EdgeInsets.fromLTRB(24, 28, 24, 0),
+                              child: Text('Start typing to search',
+                                  style: TextStyle(
+                                      color: Colors.white38, fontSize: 14)),
+                            ),
+                            data: (favs) => favs.isEmpty
+                                ? const Padding(
+                                    padding: EdgeInsets.fromLTRB(24, 28, 24, 0),
+                                    child: Text('Start typing to search',
+                                        style: TextStyle(
+                                            color: Colors.white38,
+                                            fontSize: 14)),
+                                  )
+                                : ListView(
+                                    padding: EdgeInsets.zero,
+                                    children: [
+                                      const Padding(
+                                        padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
+                                        child: Text(
+                                          'Saved Places',
+                                          style: TextStyle(
+                                            color: Colors.white38,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                      ),
+                                      for (final fav in favs)
+                                        InkWell(
+                                          onTap: () => _selectFavorite(fav),
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 20, vertical: 12),
+                                            child: Row(
+                                              children: [
+                                                Container(
+                                                  width: 36,
+                                                  height: 36,
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFF122340),
+                                                    borderRadius:
+                                                        BorderRadius.circular(18),
+                                                  ),
+                                                  child: const Icon(
+                                                      Icons.star,
+                                                      color: Color(0xFF7FDBFF),
+                                                      size: 18),
+                                                ),
+                                                const SizedBox(width: 14),
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment.start,
+                                                    children: [
+                                                      Text(
+                                                        fav.label,
+                                                        style: const TextStyle(
+                                                            color: Colors.white,
+                                                            fontSize: 14,
+                                                            fontWeight:
+                                                                FontWeight.w500),
+                                                        maxLines: 1,
+                                                        overflow:
+                                                            TextOverflow.ellipsis,
+                                                      ),
+                                                      if (fav.destName.isNotEmpty)
+                                                        Text(
+                                                          fav.destName,
+                                                          style: const TextStyle(
+                                                              color: Colors.white38,
+                                                              fontSize: 12),
+                                                          maxLines: 1,
+                                                          overflow:
+                                                              TextOverflow.ellipsis,
+                                                        ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      const Divider(
+                                          height: 1, color: Colors.white10),
+                                      const Padding(
+                                        padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
+                                        child: Text(
+                                          'Or start typing to search',
+                                          style: TextStyle(
+                                              color: Colors.white38, fontSize: 13),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                          );
+                        }
+
+                        return activeSuggestions.isEmpty && !isLoading
+                          ? const Padding(
+                              padding: EdgeInsets.fromLTRB(24, 28, 24, 0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(Icons.history,
+                                          color: Colors.white24, size: 18),
+                                      SizedBox(width: 10),
+                                      Text(
+                                        'Start typing to search',
+                                        style: TextStyle(
+                                            color: Colors.white38,
+                                            fontSize: 14),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ListView.separated(
+                              padding: EdgeInsets.zero,
+                              itemCount: activeSuggestions.length,
+                              separatorBuilder: (_, __) => const Divider(
+                                height: 1,
+                                color: Colors.white10,
+                                indent: 64,
+                              ),
+                              itemBuilder: (_, i) {
+                                final s = activeSuggestions[i];
+                                return InkWell(
+                                  onTap: () => _originFieldActive
+                                      ? _selectOriginSuggestion(s)
+                                      : _selectSuggestion(s),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 20, vertical: 14),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 36,
+                                          height: 36,
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF122340),
+                                            borderRadius:
+                                                BorderRadius.circular(18),
+                                          ),
+                                          child: const Icon(Icons.place,
+                                              color: Color(0xFF7FDBFF),
+                                              size: 18),
+                                        ),
+                                        const SizedBox(width: 14),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                s.mainText,
+                                                style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 14,
+                                                    fontWeight:
+                                                        FontWeight.w500),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              if (s.secondaryText.isNotEmpty)
+                                                Text(
+                                                  s.secondaryText,
+                                                  style: const TextStyle(
+                                                      color: Colors.white38,
+                                                      fontSize: 12),
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        const Icon(Icons.north_west,
+                                            color: Colors.white24, size: 16),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            );
+                      }),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          // Map controls — stacked bottom-right, slide up with route panel
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOut,
+            bottom: _activeRoute != null ? 180 : 32,
             right: 16,
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
+                // Map type picker
                 _MapControlButton(
-                  icon: Icons.add,
-                  tooltip: 'Zoom in',
-                  onPressed: () =>
-                      _mapController?.animateCamera(CameraUpdate.zoomIn()),
+                  icon: Icons.layers_outlined,
+                  tooltip: 'Map type',
+                  onPressed: _showMapTypePicker,
                 ),
                 const SizedBox(height: 8),
+                // Bus options popup
                 _MapControlButton(
-                  icon: Icons.remove,
-                  tooltip: 'Zoom out',
-                  onPressed: () =>
-                      _mapController?.animateCamera(CameraUpdate.zoomOut()),
+                  icon: _busMode == _BusMode.hideAll
+                      ? Icons.directions_bus_filled
+                      : Icons.directions_bus,
+                  tooltip: 'Bus options',
+                  active: _busMode != _BusMode.showAll,
+                  onPressed: _showBusPicker,
                 ),
                 const SizedBox(height: 8),
+                // My location
                 _MapControlButton(
                   icon: hasLocation
                       ? Icons.my_location
@@ -714,19 +1420,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 class _ActiveRoutePanel extends StatelessWidget {
   final TransitRoute route;
   final String destName;
-  final bool expanded;
-  final bool filterActive;
-  final VoidCallback onToggleExpand;
-  final VoidCallback onToggleFilter;
+  final ScrollController scrollController;
   final VoidCallback onCancel;
 
   const _ActiveRoutePanel({
     required this.route,
     required this.destName,
-    required this.expanded,
-    required this.filterActive,
-    required this.onToggleExpand,
-    required this.onToggleFilter,
+    required this.scrollController,
     required this.onCancel,
   });
 
@@ -739,13 +1439,12 @@ class _ActiveRoutePanel extends StatelessWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         boxShadow: [BoxShadow(color: Colors.black54, blurRadius: 12)],
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+      child: ListView(
+        controller: scrollController,
+        padding: EdgeInsets.zero,
         children: [
-          // Handle
-          GestureDetector(
-            onTap: onToggleExpand,
-            behavior: HitTestBehavior.opaque,
+          // Drag handle
+          Center(
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 10),
               child: Container(
@@ -763,8 +1462,7 @@ class _ActiveRoutePanel extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 0, 12, 12),
             child: Row(
               children: [
-                const Icon(Icons.navigation,
-                    color: Color(0xFF7FDBFF), size: 20),
+                const Icon(Icons.navigation, color: Color(0xFF7FDBFF), size: 20),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Column(
@@ -781,19 +1479,16 @@ class _ActiveRoutePanel extends StatelessWidget {
                       ),
                       Text(
                         '${route.totalDuration}  ·  ${route.departureTime} → ${route.arrivalTime}',
-                        style: const TextStyle(
-                            color: Colors.white54, fontSize: 12),
+                        style: const TextStyle(color: Colors.white54, fontSize: 12),
                       ),
                     ],
                   ),
                 ),
-                // Pills summary (horizontal scroll)
+                // Pills summary
                 Flexible(
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: _buildMiniPills(merged),
-                    ),
+                    child: Row(children: _buildMiniPills(merged)),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -806,88 +1501,40 @@ class _ActiveRoutePanel extends StatelessWidget {
                       color: Colors.white10,
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: const Icon(Icons.close,
-                        color: Colors.white54, size: 18),
+                    child: const Icon(Icons.close, color: Colors.white54, size: 18),
                   ),
                 ),
               ],
             ),
           ),
 
-          // Filter toggle chip
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-            child: GestureDetector(
-              onTap: onToggleFilter,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 7),
-                decoration: BoxDecoration(
-                  color: filterActive
-                      ? const Color(0xFF7FDBFF)
-                      : Colors.white10,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      filterActive
-                          ? Icons.directions_bus
-                          : Icons.directions_bus_outlined,
-                      size: 15,
-                      color: filterActive
-                          ? const Color(0xFF0D1B2A)
-                          : Colors.white54,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      filterActive
-                          ? 'Showing route buses only'
-                          : 'Show route buses only',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: filterActive
-                            ? const Color(0xFF0D1B2A)
-                            : Colors.white54,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Icon(
-                      filterActive
-                          ? Icons.check_circle
-                          : Icons.radio_button_unchecked,
-                      size: 14,
-                      color: filterActive
-                          ? const Color(0xFF0D1B2A)
-                          : Colors.white38,
-                    ),
-                  ],
-                ),
-              ),
+          // Swipe hint
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 0, 16, 6),
+            child: Row(
+              children: [
+                Icon(Icons.keyboard_arrow_up, color: Colors.white24, size: 16),
+                SizedBox(width: 4),
+                Text('Swipe up for step-by-step directions',
+                    style: TextStyle(color: Colors.white24, fontSize: 11)),
+              ],
             ),
           ),
 
-          // Expanded steps
-          if (expanded) ...[
-            const Divider(height: 1, color: Colors.white10),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 260),
-              child: ListView.builder(
-                shrinkWrap: true,
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                itemCount: merged.length,
-                itemBuilder: (_, i) {
-                  final s = merged[i];
-                  return s.travelMode == 'TRANSIT'
+          const Divider(height: 1, color: Colors.white10),
+
+          // Step-by-step directions
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+            child: Column(
+              children: [
+                for (final s in merged)
+                  s.travelMode == 'TRANSIT'
                       ? _NavTransitRow(step: s)
-                      : _NavWalkRow(step: s);
-                },
-              ),
+                      : _NavWalkRow(step: s),
+              ],
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -908,7 +1555,7 @@ class _ActiveRoutePanel extends StatelessWidget {
         widgets.add(Container(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
           decoration: BoxDecoration(
-            color: const Color(0xFF0F4C81),
+            color: _transitColor(s.vehicleType),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Text(label,
@@ -938,8 +1585,8 @@ class _NavTransitRow extends StatelessWidget {
         children: [
           Container(
             width: 32, height: 32,
-            decoration: const BoxDecoration(
-                color: Color(0xFF0F4C81), shape: BoxShape.circle),
+            decoration: BoxDecoration(
+                color: _transitColor(step.vehicleType), shape: BoxShape.circle),
             child: Center(
               child: Text(_vehicleEmoji(step.vehicleType),
                   style: const TextStyle(fontSize: 14)),
@@ -956,7 +1603,7 @@ class _NavTransitRow extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0F4C81),
+                        color: _transitColor(step.vehicleType),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
@@ -1044,21 +1691,76 @@ String _vehicleEmoji(String? type) {
   }
 }
 
+// ─── Bus Radio Tile ───────────────────────────────────────────────────────────
+
+class _BusRadioTile extends StatelessWidget {
+  final String label;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _BusRadioTile({
+    required this.label,
+    required this.subtitle,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+        child: Row(
+          children: [
+            Radio<bool>(
+              value: true,
+              groupValue: selected,
+              onChanged: (_) => onTap(),
+              activeColor: const Color(0xFF7FDBFF),
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label,
+                      style: TextStyle(
+                          color: selected ? const Color(0xFF7FDBFF) : Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600)),
+                  Text(subtitle,
+                      style: const TextStyle(
+                          color: Colors.white38, fontSize: 12)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ─── Map Control Button ───────────────────────────────────────────────────────
 
 class _MapControlButton extends StatelessWidget {
   final IconData icon;
   final String tooltip;
   final VoidCallback? onPressed;
+  final bool active;
   const _MapControlButton(
-      {required this.icon, required this.tooltip, this.onPressed});
+      {required this.icon, required this.tooltip, this.onPressed, this.active = false});
 
   @override
   Widget build(BuildContext context) {
     return Tooltip(
       message: tooltip,
       child: Material(
-        color: const Color(0xE6122340),
+        color: active ? const Color(0xFF7FDBFF).withOpacity(0.2) : const Color(0xE6122340),
         shape: const CircleBorder(),
         elevation: 3,
         child: InkWell(
@@ -1067,235 +1769,10 @@ class _MapControlButton extends StatelessWidget {
           child: SizedBox(
             width: 40,
             height: 40,
-            child: Icon(icon, color: Colors.white, size: 20),
+            child: Icon(icon,
+                color: active ? const Color(0xFF7FDBFF) : Colors.white,
+                size: 20),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Profile Button ───────────────────────────────────────────────────────────
-
-class _ProfileButton extends ConsumerWidget {
-  final VoidCallback onTap;
-  const _ProfileButton({required this.onTap});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final auth = ref.watch(authProvider);
-    final initials = auth.isLoggedIn && auth.displayName.isNotEmpty
-        ? auth.displayName
-            .trim()
-            .split(' ')
-            .take(2)
-            .map((w) => w[0].toUpperCase())
-            .join()
-        : null;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 46,
-        height: 46,
-        decoration: BoxDecoration(
-          color: const Color(0xE6122340),
-          shape: BoxShape.circle,
-          boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 6)],
-        ),
-        child: Center(
-          child: initials != null
-              ? Text(
-                  initials,
-                  style: const TextStyle(
-                    color: Color(0xFF7FDBFF),
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                  ),
-                )
-              : const Icon(Icons.person_outline,
-                  color: Colors.white54, size: 22),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Account Menu Sheet ───────────────────────────────────────────────────────
-
-class _AccountMenuSheet extends StatelessWidget {
-  final AuthState auth;
-  final VoidCallback onLogin;
-  final VoidCallback onRegister;
-  final VoidCallback onAccount;
-  final VoidCallback onLogout;
-
-  const _AccountMenuSheet({
-    required this.auth,
-    required this.onLogin,
-    required this.onRegister,
-    required this.onAccount,
-    required this.onLogout,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF0D1B2A),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Handle
-          Container(
-            margin: const EdgeInsets.symmetric(vertical: 12),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.white24,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-
-          if (auth.isLoggedIn) ...[
-            // Logged-in header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor: const Color(0xFF0F4C81),
-                    child: Text(
-                      auth.displayName.isNotEmpty
-                          ? auth.displayName
-                              .trim()
-                              .split(' ')
-                              .take(2)
-                              .map((w) => w[0].toUpperCase())
-                              .join()
-                          : '?',
-                      style: const TextStyle(
-                        color: Color(0xFF7FDBFF),
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(auth.displayName,
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold)),
-                      Text(auth.email,
-                          style: const TextStyle(
-                              color: Colors.white54, fontSize: 13)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1, color: Colors.white10),
-            _MenuItem(
-              icon: Icons.manage_accounts_outlined,
-              label: 'My Account',
-              onTap: onAccount,
-            ),
-            const Divider(height: 1, color: Colors.white10),
-            _MenuItem(
-              icon: Icons.logout,
-              label: 'Sign Out',
-              color: Colors.redAccent,
-              onTap: onLogout,
-            ),
-          ] else ...[
-            // Guest header
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 4, 20, 16),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor: Color(0xFF122340),
-                    child: Icon(Icons.person_outline,
-                        color: Colors.white38, size: 24),
-                  ),
-                  SizedBox(width: 14),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Guest',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold)),
-                      Text('Sign in to save routes',
-                          style: TextStyle(
-                              color: Colors.white54, fontSize: 13)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1, color: Colors.white10),
-            _MenuItem(
-              icon: Icons.login,
-              label: 'Sign In',
-              color: const Color(0xFF7FDBFF),
-              onTap: onLogin,
-            ),
-            const Divider(height: 1, color: Colors.white10),
-            _MenuItem(
-              icon: Icons.person_add_outlined,
-              label: 'Create Account',
-              onTap: onRegister,
-            ),
-          ],
-
-          const SizedBox(height: 16),
-        ],
-      ),
-    );
-  }
-}
-
-class _MenuItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _MenuItem({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.color = Colors.white,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        child: Row(
-          children: [
-            Icon(icon, color: color, size: 22),
-            const SizedBox(width: 16),
-            Text(label,
-                style: TextStyle(
-                    color: color,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500)),
-            const Spacer(),
-            Icon(Icons.chevron_right, color: color.withOpacity(0.4), size: 20),
-          ],
         ),
       ),
     );
@@ -1633,11 +2110,18 @@ class _VehicleReportSheetState extends State<_VehicleReportSheet> {
                     emoji: '⏱',
                     label: 'Delay',
                     sublabels: const [
-                      'On time',
-                      'Slight',
-                      'Moderate',
-                      'Late',
-                      'Very late'
+                      '1+ min',
+                      '3+ min',
+                      '5+ min',
+                      '10+ min',
+                      '20+ min',
+                    ],
+                    buttonLabels: const [
+                      '1+ min',
+                      '3+ min',
+                      '5+ min',
+                      '10+ min',
+                      '20+ min',
                     ],
                     value: _delay,
                     onChanged: (v) => setState(() => _delay = v),
@@ -1696,6 +2180,7 @@ class _RatingRow extends StatelessWidget {
   final String emoji;
   final String label;
   final List<String> sublabels;
+  final List<String>? buttonLabels;
   final int value; // 0 = unset, 1–5 = selected
   final ValueChanged<int> onChanged;
 
@@ -1703,6 +2188,7 @@ class _RatingRow extends StatelessWidget {
     required this.emoji,
     required this.label,
     required this.sublabels,
+    this.buttonLabels,
     required this.value,
     required this.onChanged,
   });
@@ -1760,13 +2246,13 @@ class _RatingRow extends StatelessWidget {
                     ),
                     child: Center(
                       child: Text(
-                        '$level',
+                        buttonLabels != null ? buttonLabels![i] : '$level',
                         style: TextStyle(
                           color: filled ? Colors.white : Colors.white38,
                           fontWeight: filled
                               ? FontWeight.bold
                               : FontWeight.normal,
-                          fontSize: 15,
+                          fontSize: buttonLabels != null ? 12 : 15,
                         ),
                       ),
                     ),
@@ -1776,17 +2262,18 @@ class _RatingRow extends StatelessWidget {
             );
           }),
         ),
-        // Scale hint
-        const Padding(
-          padding: EdgeInsets.only(top: 4),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('1 = Low', style: TextStyle(color: Colors.white24, fontSize: 10)),
-              Text('5 = High', style: TextStyle(color: Colors.white24, fontSize: 10)),
-            ],
+        // Scale hint — only shown for numeric ratings
+        if (buttonLabels == null)
+          const Padding(
+            padding: EdgeInsets.only(top: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('1 = Low', style: TextStyle(color: Colors.white24, fontSize: 10)),
+                Text('5 = High', style: TextStyle(color: Colors.white24, fontSize: 10)),
+              ],
+            ),
           ),
-        ),
       ],
     );
   }

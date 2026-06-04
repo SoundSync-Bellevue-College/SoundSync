@@ -29,7 +29,6 @@
         <span class="hourly-time">{{ formatHour(period.startTime) }}</span>
         <span class="hourly-emoji">{{ weatherEmoji(period.shortForecast, period.isDaytime) }}</span>
         <span class="hourly-temp">{{ displayTemp(period.temperature) }}</span>
-        <span class="hourly-desc">{{ period.shortForecast }}</span>
         <span class="hourly-wind">💨 {{ period.windSpeed }}</span>
       </div>
     </div>
@@ -122,7 +121,7 @@ onMounted(() => {
 .weather-widget {
   background: var(--color-surface);
   border-radius: var(--radius-sm);
-  padding: 0.65rem 0.75rem;
+  padding: 0.4rem 0.6rem;
   width: 100%;
 }
 
@@ -130,7 +129,7 @@ onMounted(() => {
   display: flex;
   align-items: baseline;
   gap: 0.4rem;
-  margin-bottom: 0.6rem;
+  margin-bottom: 0.3rem;
 }
 
 .weather-title {
@@ -174,13 +173,13 @@ onMounted(() => {
 
 /* Individual hour card */
 .hourly-card {
-  flex: 0 0 72px;
+  flex: 0 0 58px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.22rem;
-  padding: 0.5rem 0.3rem;
-  border-radius: 10px;
+  gap: 0.1rem;
+  padding: 0.3rem 0.2rem;
+  border-radius: 8px;
   font-size: 0.7rem;
   color: #fff;
   text-align: center;
@@ -199,12 +198,12 @@ onMounted(() => {
 }
 
 .hourly-emoji {
-  font-size: 1.6rem;
+  font-size: 1.15rem;
   line-height: 1;
 }
 
 .hourly-temp {
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   font-weight: 700;
 }
 

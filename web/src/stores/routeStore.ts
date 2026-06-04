@@ -6,11 +6,13 @@ import { routeService } from '@/services/routeService'
 export const useRouteStore = defineStore('route', () => {
   // shallowRef so Vue doesn't try to deeply proxy the Google Maps object
   const directionsResult = shallowRef<google.maps.DirectionsResult | null>(null)
+  const selectedRouteIndex = ref(0)
   const favorites = ref<FavoriteRoute[]>([])
   const planError = ref<string | null>(null)
 
   function setDirectionsResult(result: google.maps.DirectionsResult | null) {
     directionsResult.value = result
+    selectedRouteIndex.value = 0
     planError.value = null
   }
 
@@ -21,6 +23,7 @@ export const useRouteStore = defineStore('route', () => {
 
   function clearPlan() {
     directionsResult.value = null
+    selectedRouteIndex.value = 0
     planError.value = null
   }
 
@@ -41,6 +44,7 @@ export const useRouteStore = defineStore('route', () => {
 
   return {
     directionsResult,
+    selectedRouteIndex,
     favorites,
     planError,
     setDirectionsResult,

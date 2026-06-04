@@ -8,6 +8,7 @@ export interface VehiclePosition {
   speed: number
   timestamp: string
   occupancyStatus?: string
+  routeType?: string // BUS | RAIL | STREETCAR | FERRY
 }
 
 export interface Stop {

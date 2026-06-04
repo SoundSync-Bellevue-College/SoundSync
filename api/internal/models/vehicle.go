@@ -11,4 +11,5 @@ type VehiclePosition struct {
 	Speed           float32 `json:"speed"`
 	Timestamp       string  `json:"timestamp"`
 	OccupancyStatus string  `json:"occupancyStatus,omitempty"`
+	RouteType       string  `json:"routeType,omitempty"` // BUS | RAIL | STREETCAR | FERRY
 }

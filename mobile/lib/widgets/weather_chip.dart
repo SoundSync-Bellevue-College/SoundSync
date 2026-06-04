@@ -43,24 +43,27 @@ class WeatherChip extends ConsumerWidget {
 
     final weatherAsync = ref.watch(_currentWeatherProvider(coords));
 
-    return weatherAsync.when(
-      data: (w) {
-        final temp = (w['temp'] as num?)?.round() ?? '--';
-        final emoji = _weatherEmoji(w['description'] as String? ?? '');
-        return Material(
-          elevation: 6,
-          borderRadius: BorderRadius.circular(24),
-          color: Colors.transparent,
-          child: InkWell(
+    return Material(
+      elevation: 6,
+      borderRadius: BorderRadius.circular(24),
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        onTap: () => _showHourlySheet(context, ref, coords),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xE6122340),
             borderRadius: BorderRadius.circular(24),
-            onTap: () => _showHourlySheet(context, ref, coords),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xE6122340),
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Row(
+            boxShadow: const [
+              BoxShadow(color: Colors.black38, blurRadius: 6),
+            ],
+          ),
+          child: weatherAsync.when(
+            data: (w) {
+              final temp = (w['temp'] as num?)?.round() ?? '--';
+              final emoji = _weatherEmoji(w['description'] as String? ?? '');
+              return Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(emoji, style: const TextStyle(fontSize: 18)),
@@ -74,13 +77,33 @@ class WeatherChip extends ConsumerWidget {
                     ),
                   ),
                 ],
-              ),
+              );
+            },
+            loading: () => const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.cloud_outlined, color: Colors.white54, size: 20),
+                SizedBox(width: 6),
+                SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 1.5, color: Colors.white38),
+                ),
+              ],
+            ),
+            error: (_, __) => const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.cloud_off_outlined, color: Colors.white38, size: 20),
+                SizedBox(width: 6),
+                Text('--°F',
+                    style: TextStyle(color: Colors.white38, fontSize: 14)),
+              ],
             ),
           ),
-        );
-      },
-      loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
+        ),
+      ),
     );
   }
 

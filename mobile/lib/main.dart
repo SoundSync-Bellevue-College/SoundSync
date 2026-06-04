@@ -3,9 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'providers/auth_provider.dart';
-import 'screens/home_screen.dart';
+import 'screens/main_shell.dart';
 import 'screens/route_detail_screen.dart';
-import 'screens/account_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
 
@@ -15,13 +14,12 @@ void main() {
 
 final _router = GoRouter(
   routes: [
-    GoRoute(path: '/', builder: (_, __) => const HomeScreen()),
+    GoRoute(path: '/', builder: (_, __) => const MainShell()),
     GoRoute(
       path: '/route/:id',
       builder: (_, state) =>
           RouteDetailScreen(routeId: state.pathParameters['id']!),
     ),
-    GoRoute(path: '/account', builder: (_, __) => const AccountScreen()),
     GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
     GoRoute(path: '/register', builder: (_, __) => const RegisterScreen()),
   ],

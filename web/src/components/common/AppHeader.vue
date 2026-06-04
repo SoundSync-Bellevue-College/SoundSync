@@ -9,10 +9,15 @@
 
     <nav class="header-nav">
       <RouterLink to="/" class="nav-link">Map</RouterLink>
+      <RouterLink to="/score" class="nav-link">Score</RouterLink>
+      <RouterLink to="/about" class="nav-link">About</RouterLink>
       <RouterLink v-if="auth.isLoggedIn" to="/account" class="nav-link">Account</RouterLink>
     </nav>
 
     <div class="header-actions">
+      <!-- Service Alert Dropdown (visible to all users) -->
+      <ServiceAlertDropdown />
+
       <template v-if="auth.isLoggedIn">
         <!-- Bell button -->
         <div class="bell-wrapper" ref="bellWrapper">
@@ -71,6 +76,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '@/stores/authStore'
 import { useNotificationStore } from '@/stores/notificationStore'
 import { useRouter } from 'vue-router'
+import ServiceAlertDropdown from './ServiceAlertDropdown.vue'
 
 const auth = useAuthStore()
 const notif = useNotificationStore()
@@ -156,15 +162,43 @@ function formatTime(iso: string): string {
 
 .nav-link {
   color: var(--color-text-muted);
-  font-size: 0.9rem;
-  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 0.3rem 0.75rem;
   border-radius: var(--radius-sm);
-  transition: color 0.15s;
+  border: 1px solid var(--color-border);
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  text-decoration: none;
 }
 
-.nav-link:hover,
-.nav-link.router-link-active {
+.nav-link:hover {
   color: var(--color-text);
+  border-color: color-mix(in srgb, var(--color-primary) 50%, transparent);
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+}
+
+.nav-link.router-link-active {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+}
+
+/* About link glow animation */
+.nav-link[href="/about"] {
+  animation: about-glow 2.5s ease-in-out infinite;
+}
+
+@keyframes about-glow {
+  0%, 100% {
+    border-color: var(--color-border);
+    box-shadow: none;
+    color: var(--color-text-muted);
+  }
+  50% {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--color-primary) 50%, transparent);
+    color: var(--color-primary);
+  }
 }
 
 .header-actions {
@@ -333,5 +367,55 @@ function formatTime(iso: string): string {
   font-size: 0.75rem;
   color: var(--color-text-muted);
   margin-top: 0.25rem;
+}
+
+/* ── Mobile ─────────────────────────────────────────────────────────────────── */
+
+@media (max-width: 600px) {
+  .app-header {
+    padding: 0 0.75rem;
+    gap: 0.5rem;
+  }
+
+  .brand-name {
+    display: none;
+  }
+
+  .header-nav {
+    gap: 0.35rem;
+  }
+
+  .nav-link {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.4rem;
+    border: none;
+  }
+
+  .nav-link.router-link-active {
+    border: none;
+    background: color-mix(in srgb, var(--color-primary) 15%, transparent);
+  }
+
+  .nav-link[href="/about"] {
+    animation: none;
+  }
+
+  .user-name {
+    display: none;
+  }
+
+  .btn-ghost {
+    font-size: 0.75rem;
+    padding: 0.3rem 0.5rem;
+  }
+
+  .btn-primary {
+    font-size: 0.75rem;
+    padding: 0.3rem 0.5rem;
+  }
+
+  .header-actions {
+    gap: 0.35rem;
+  }
 }
 </style>

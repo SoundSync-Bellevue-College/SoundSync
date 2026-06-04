@@ -9,14 +9,20 @@
 </template>
 
 <script setup lang="ts">
-import { watch } from 'vue'
+import { watch, onMounted } from 'vue'
 import AppHeader from '@/components/common/AppHeader.vue'
 import NotificationToast from '@/components/common/NotificationToast.vue'
 import { useAuthStore } from '@/stores/authStore'
 import { useNotificationStore } from '@/stores/notificationStore'
+import { useServiceAlertStore } from '@/stores/serviceAlertStore'
 
 const auth = useAuthStore()
 const notif = useNotificationStore()
+const serviceAlerts = useServiceAlertStore()
+
+onMounted(() => {
+  serviceAlerts.startPolling()
+})
 
 watch(
   () => auth.isLoggedIn,
@@ -42,6 +48,7 @@ html,
 body,
 #app-root {
   height: 100%;
+  overflow-x: hidden;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background-color: #0f172a;
   color: #f1f5f9;

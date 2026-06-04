@@ -1,0 +1,1164 @@
+{
+  "header": {
+    "gtfs_realtime_version": "2.0",
+    "incrementality": "FULL_DATASET",
+    "timestamp": 1776885430
+  },
+  "entity": [
+    {
+      "id": "7378",
+      "alert": {
+        "effect": "ACCESSIBILITY_ISSUE",
+        "effect_detail": {
+          "translation": [
+            {
+              "text": "ANNOUNCEMENT",
+              "language": "en"
+            }
+          ]
+        },
+        "cause": "CONSTRUCTION",
+        "cause_detail": {
+          "translation": [
+            {
+              "text": "CONSTRUCTION",
+              "language": "en"
+            }
+          ]
+        },
+        "header_text": {
+          "translation": [
+            {
+              "text": "SeaTac Airport Station 2nd pedestrian bridge elevator construction begins January 8, 2025.",
+              "language": "en"
+            }
+          ]
+        },
+        "description_text": {
+          "translation": [
+            {
+              "text": "Beginning January 8, 2025, through 2026, construction will take place at SeaTac Airport Station to add a new elevator to the pedestrian bridge. The new elevator will provide an additional option for passengers to travel from the pedestrian bridge to the pickup/drop off parking lot adjacent to the station. During construction, passengers can expect pedestrian walkways to occasionally be blocked or narrowed, and access to the current elevator periodically interrupted.\r\n\nDuring times where pedestrian walkways are blocked and elevator access is unavailable, passengers may catch the Rapid Ride A Line bus from SeaTac Airport Station to Tukwila International Boulevard Station in order to use the 1 Line.  \r\n\nThe pedestrian bridge from the station to the airport will be unaffected and available throughout the duration of this project. \r\n\nBeginning February 10, 2025 half of the passenger pick up/drop off area will be closed, as will some parts of the plaza near the stairs and existing elevator as equipment begins to come in for construction of the new elevator.\r\n\nAdditional information about changes in elevator accessibility will be provided as it comes available.",
+              "language": "en"
+            }
+          ]
+        },
+        "severity_level": "WARNING",
+        "url": {
+          "translation": [
+            {
+              "text": "https://www.soundtransit.org/blog/platform/improving-accessibility-seatac-station-new-elevator-coming-soon",
+              "language": "en"
+            }
+          ]
+        },
+        "active_period": [
+          {
+            "start": 1736334000
+          }
+        ],
+        "informed_entity": [
+          {
+            "route_type": 0,
+            "route_id": "100479",
+            "stop_id": "99903"
+          },
+          {
+            "route_type": 0,
+            "route_id": "100479",
+            "stop_id": "99904"
+          },
+          {
+            "route_type": 0,
+            "route_id": "100479",
+            "stop_id": "C37-E-00001"
+          },
+          {
+            "route_type": 0,
+            "route_id": "100479",
+            "stop_id": "C37-E-00002"
+          }
+        ]
+      }
+    },
+    {
+      "id": "9962",
+      "alert": {
+        "effect": "OTHER_EFFECT",
+        "effect_detail": {
+          "translation": [
+            {
+              "text": "ANNOUNCEMENT",
+              "language": "en"
+            }
+          ]
+        },
+        "cause": "UNKNOWN_CAUSE",
+        "cause_detail": {
+          "translation": [
+            {
+              "text": "UNKNOWN_CAUSE",
+              "language": "en"
+            }
+          ]
+        },
+        "header_text": {
+          "translation": [
+            {
+              "text": "East stairwell at South Bellevue Station Garage is closed",
+              "language": "en"
+            }
+          ]
+        },
+        "description_text": {
+          "translation": [
+            {
+              "text": "The east stairwell in the center of the South Bellevue Station Garage is closed until further notice due to needed maintenance. To exit the garage, please use the stairwells located along the perimeters of the north and south ends.\r\n\nAffected lines:\r\n2 Line",
+              "language": "en"
+            }
+          ]
+        },
+        "severity_level": "WARNING",
+        "url": {
+          "translation": [
+            {
+              "text": "https://SoundTransit.org/alert/st/9962",
+              "language": "en"
+            }
+          ]
+        },
+        "active_period": [
+          {
+            "start": 1747743420
+          }
+        ],
+        "informed_entity": [
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "2LINE",
+            "stop_id": "E09-T1"
+          },
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "2LINE",
+            "stop_id": "E09-T2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "15938",
+      "alert": {
+        "effect": "ACCESSIBILITY_ISSUE",
+        "effect_detail": {
+          "translation": [
+            {
+              "text": "ANNOUNCEMENT",
+              "language": "en"
+            }
+          ]
+        },
+        "cause": "MAINTENANCE",
+        "cause_detail": {
+          "translation": [
+            {
+              "text": "MAINTENANCE",
+              "language": "en"
+            }
+          ]
+        },
+        "header_text": {
+          "translation": [
+            {
+              "text": "Escalator upgrades at Int'l Dist/Chinatown Station",
+              "language": "en"
+            }
+          ]
+        },
+        "description_text": {
+          "translation": [
+            {
+              "text": "Sound Transit continues to upgrade escalators at International District/Chinatown Station. See below for current service status during the improvement process.\r\n\nExit B – to 5th Ave S & King St:\r\n\n• Escalator 903 from Lynnwood platform – out of service\r\n• Escalator 904 from Federal Way platform – out of service\r\n\nPassengers who need assistance while at a Sound Transit station, can call or text Security at (206) 398-5268.",
+              "language": "en"
+            }
+          ]
+        },
+        "severity_level": "WARNING",
+        "url": {
+          "translation": [
+            {
+              "text": "https://www.soundtransit.org/ride-with-us/stops-stations/international-district-chinatown-station?route_tab=arrivals",
+              "language": "en"
+            }
+          ]
+        },
+        "active_period": [
+          {
+            "start": 1763954760
+          }
+        ],
+        "informed_entity": [
+          {
+            "route_type": 0,
+            "route_id": "100479",
+            "stop_id": "623"
+          },
+          {
+            "route_type": 0,
+            "route_id": "2LINE",
+            "stop_id": "623"
+          },
+          {
+            "route_type": 0,
+            "route_id": "100479",
+            "stop_id": "C09-E-00001"
+          },
+          {
+            "route_type": 0,
+            "route_id": "2LINE",
+            "stop_id": "C09-E-00001"
+          },
+          {
+            "route_type": 0,
+            "route_id": "100479",
+            "stop_id": "C09-E-00002"
+          },
+          {
+            "route_type": 0,
+            "route_id": "2LINE",
+            "stop_id": "C09-E-00002"
+          },
+          {
+            "route_type": 0,
+            "route_id": "100479",
+            "stop_id": "C09-E-00003"
+          },
+          {
+            "route_type": 0,
+            "route_id": "2LINE",
+            "stop_id": "C09-E-00003"
+          },
+          {
+            "route_type": 0,
+            "route_id": "100479",
+            "stop_id": "C09-E-00004"
+          },
+          {
+            "route_type": 0,
+            "route_id": "2LINE",
+            "stop_id": "C09-E-00004"
+          }
+        ]
+      }
+    },
+    {
+      "id": "16623",
+      "alert": {
+        "effect": "OTHER_EFFECT",
+        "effect_detail": {
+          "translation": [
+            {
+              "text": "ANNOUNCEMENT",
+              "language": "en"
+            }
+          ]
+        },
+        "cause": "UNKNOWN_CAUSE",
+        "cause_detail": {
+          "translation": [
+            {
+              "text": "UNKNOWN_CAUSE",
+              "language": "en"
+            }
+          ]
+        },
+        "header_text": {
+          "translation": [
+            {
+              "text": "Starting Monday, March 16, Sound Transit will close Kent Station’s northwest Sounder surface parking lot.",
+              "language": "en"
+            }
+          ]
+        },
+        "description_text": {
+          "translation": [
+            {
+              "text": "The only available spots for this lot will be three ADA parking spots. This closure will last the duration of this project phase. We expect this phase to be completed in December 2026. We encourage drivers to use the existing Kent garage at W Smith St and 1st Ave N.  \r\n\nFor more information on the project, visit the Kent Station Parking and Access Improvement Project page. \r\n",
+              "language": "en"
+            }
+          ]
+        },
+        "severity_level": "WARNING",
+        "url": {
+          "translation": [
+            {
+              "text": "https://www.soundtransit.org/system-expansion/kent-station-parking-access-improvements",
+              "language": "en"
+            }
+          ]
+        },
+        "active_period": [
+          {
+            "start": 1773655200,
+            "end": 1798799400
+          }
+        ],
+        "informed_entity": [
+          {
+            "agency_id": "40",
+            "route_type": 2,
+            "route_id": "SNDR_TL",
+            "stop_id": "S_KE_NB"
+          },
+          {
+            "agency_id": "40",
+            "route_type": 2,
+            "route_id": "SNDR_TL",
+            "stop_id": "S_KE_SB"
+          }
+        ]
+      }
+    },
+    {
+      "id": "16943",
+      "alert": {
+        "effect": "OTHER_EFFECT",
+        "effect_detail": {
+          "translation": [
+            {
+              "text": "ANNOUNCEMENT",
+              "language": "en"
+            }
+          ]
+        },
+        "cause": "MAINTENANCE",
+        "cause_detail": {
+          "translation": [
+            {
+              "text": "MAINTENANCE_ACTIVITY",
+              "language": "en"
+            }
+          ]
+        },
+        "header_text": {
+          "translation": [
+            {
+              "text": "Planned work near the elevator lobby and platform at Beacon Hill Station will take place until 1 p.m. today. ",
+              "language": "en"
+            }
+          ]
+        },
+        "description_text": {
+          "translation": [
+            {
+              "text": "This work will obstruct some areas, while fixing a ceiling panel leak. Passengers will be able to get to train platforms during the repairs. \r\n\nPlease use caution when traveling near the elevators by the Federal Way-bound platform at this station. \r\n\nWe apologize for any inconvenience. When they become available, we will send updates.\r\n\nThank you. ",
+              "language": "en"
+            }
+          ]
+        },
+        "severity_level": "WARNING",
+        "url": {
+          "translation": [
+            {
+              "text": "https://www.soundtransit.org/ride-with-us/stops-stations/beacon-hill-station?route_tab=more_info ",
+              "language": "en"
+            }
+          ]
+        },
+        "active_period": [
+          {
+            "start": 1776870000,
+            "end": 1776888000
+          }
+        ],
+        "informed_entity": [
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "100479",
+            "stop_id": "99121"
+          },
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "100479",
+            "stop_id": "99240"
+          }
+        ]
+      }
+    },
+    {
+      "id": "16985",
+      "alert": {
+        "effect": "ACCESSIBILITY_ISSUE",
+        "effect_detail": {
+          "translation": [
+            {
+              "text": "ELEVATOR_CLOSURE",
+              "language": "en"
+            }
+          ]
+        },
+        "cause": "UNKNOWN_CAUSE",
+        "cause_detail": {
+          "translation": [
+            {
+              "text": "UNKNOWN_CAUSE",
+              "language": "en"
+            }
+          ]
+        },
+        "header_text": {
+          "translation": [
+            {
+              "text": "Capitol Hill Station elevator 1 out of service due to scheduled maintenance. The elevator at the E Denny Way exit serving the street, South Mezzanine, and platform is out of service. See below for alternate route information.",
+              "language": "en"
+            }
+          ]
+        },
+        "description_text": {
+          "translation": [
+            {
+              "text": "To ride the 1 Line and 2 Line from the street:\r\n\n1. Go to Broadway Ave E and turn right toward E John St.\r\n2. Enter the station at the corner of E John St and Broadway Ave E.\r\n3. Take the street level elevator down to the North Mezzanine for elevator access to the platform.\r\n\nTo ride the 1 Line and 2 Line from the South Mezzanine:\r\n\n1. Take the pedestrian walkway toward the west exit.\r\n2. Take elevator up to the street.\r\n3. Turn left on Broadway Ave E.\r\n4. Enter the station at the corner of E John St and Broadway Ave E.\r\n5. Take the street level elevator down to the North Mezzanine for elevator access to the platform.\r\n\nTo exit the station from the platform:\r\n\n1. Go to the opposite end of the platform toward the E John St exit.\r\n2. Take the platform elevator to the North Mezzanine.\r\n3. Take the elevator at the North Mezzanine up to the street (E John St & Broadway Ave E).",
+              "language": "en"
+            }
+          ]
+        },
+        "severity_level": "WARNING",
+        "url": {
+          "translation": [
+            {
+              "text": "https://SoundTransit.org/alert/st/16985",
+              "language": "en"
+            }
+          ]
+        },
+        "active_period": [
+          {
+            "start": 1774672500
+          }
+        ],
+        "informed_entity": [
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "100479",
+            "stop_id": "99603"
+          },
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "2LINE",
+            "stop_id": "99603"
+          },
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "100479",
+            "stop_id": "99610"
+          },
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "2LINE",
+            "stop_id": "99610"
+          },
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "100479",
+            "stop_id": "N03-E-00001"
+          },
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "2LINE",
+            "stop_id": "N03-E-00001"
+          },
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "100479",
+            "stop_id": "N03-E-00002"
+          },
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "2LINE",
+            "stop_id": "N03-E-00002"
+          },
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "100479",
+            "stop_id": "N03-E-00003"
+          },
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "2LINE",
+            "stop_id": "N03-E-00003"
+          }
+        ]
+      }
+    },
+    {
+      "id": "17014",
+      "alert": {
+        "effect": "ACCESSIBILITY_ISSUE",
+        "effect_detail": {
+          "translation": [
+            {
+              "text": "ELEVATOR_CLOSURE",
+              "language": "en"
+            }
+          ]
+        },
+        "cause": "MAINTENANCE",
+        "cause_detail": {
+          "translation": [
+            {
+              "text": "SCHEDULED_MAINTENANCE",
+              "language": "en"
+            }
+          ]
+        },
+        "header_text": {
+          "translation": [
+            {
+              "text": "Elevator outage at University of Washington Station. The elevator at the Husky Stadium exit serving the street (Montlake Blvd NE), pedestrian bridge, and platform is out of service.",
+              "language": "en"
+            }
+          ]
+        },
+        "description_text": {
+          "translation": [
+            {
+              "text": "To ride the 1 Line:\r\n\n1. Take the elevator located directly across from the out of service unit down to the platform.\r\n\nTo exit the station:\r\n\n1. Take the nearby elevator located directly across from the out of service unit up to the street or pedestrian bridge to Montlake Blvd NE.",
+              "language": "en"
+            }
+          ]
+        },
+        "severity_level": "WARNING",
+        "url": {
+          "translation": [
+            {
+              "text": "https://SoundTransit.org/alert/st/17014",
+              "language": "en"
+            }
+          ]
+        },
+        "active_period": [
+          {
+            "start": 1774844460
+          }
+        ],
+        "informed_entity": [
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "100479",
+            "stop_id": "99604"
+          },
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "2LINE",
+            "stop_id": "99604"
+          },
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "100479",
+            "stop_id": "99605"
+          },
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "2LINE",
+            "stop_id": "99605"
+          },
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "100479",
+            "stop_id": "N05-E-00001"
+          },
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "2LINE",
+            "stop_id": "N05-E-00001"
+          },
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "100479",
+            "stop_id": "N05-E-00002"
+          },
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "2LINE",
+            "stop_id": "N05-E-00002"
+          },
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "100479",
+            "stop_id": "N05-E-00003"
+          },
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "2LINE",
+            "stop_id": "N05-E-00003"
+          },
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "100479",
+            "stop_id": "N05-E-00004"
+          },
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "2LINE",
+            "stop_id": "N05-E-00004"
+          }
+        ]
+      }
+    },
+    {
+      "id": "17142",
+      "alert": {
+        "effect": "OTHER_EFFECT",
+        "effect_detail": {
+          "translation": [
+            {
+              "text": "ANNOUNCEMENT",
+              "language": "en"
+            }
+          ]
+        },
+        "cause": "OTHER_CAUSE",
+        "cause_detail": {
+          "translation": [
+            {
+              "text": "SPECIAL_EVENT",
+              "language": "en"
+            }
+          ]
+        },
+        "header_text": {
+          "translation": [
+            {
+              "text": "Mariners Game today at T-Mobile, start time 1:10 p.m. Please plan ahead for additional travel time.",
+              "language": "en"
+            }
+          ]
+        },
+        "description_text": {
+          "translation": [
+            {
+              "text": "Seattle Mariners vs Oakland Athletics\r\n\nPlease plan ahead for additional travel time and anticipate crowds in stations, on platforms, in trains, and in parking facilities. On game days, parking facilities fill up quickly and earlier in the day. Plan accordingly to ensure you can secure parking.\r\n\nClick the link below to learn about taking transit to the game or plan out your ride with our trip planner.",
+              "language": "en"
+            }
+          ]
+        },
+        "severity_level": "WARNING",
+        "url": {
+          "translation": [
+            {
+              "text": "https://www.soundtransit.org/ride-with-us/popular-destinations/t-mobile-park",
+              "language": "en"
+            }
+          ]
+        },
+        "active_period": [
+          {
+            "start": 1776888600,
+            "end": 1776906000
+          }
+        ],
+        "informed_entity": [
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "100479"
+          },
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "2LINE"
+          }
+        ]
+      }
+    },
+    {
+      "id": "17143",
+      "alert": {
+        "effect": "OTHER_EFFECT",
+        "effect_detail": {
+          "translation": [
+            {
+              "text": "ANNOUNCEMENT",
+              "language": "en"
+            }
+          ]
+        },
+        "cause": "OTHER_CAUSE",
+        "cause_detail": {
+          "translation": [
+            {
+              "text": "SPECIAL_EVENT",
+              "language": "en"
+            }
+          ]
+        },
+        "header_text": {
+          "translation": [
+            {
+              "text": "Torrent Hockey tonight at Climate Pledge Arena, start time 7 p.m. Please plan ahead for additional travel time.",
+              "language": "en"
+            }
+          ]
+        },
+        "description_text": {
+          "translation": [
+            {
+              "text": "Seattle Torrent vs. Minnesota Frost\r\n\nPlease plan ahead for additional travel time and anticipate crowds in stations, on platforms, in trains, and in parking facilities. On game days, parking facilities fill up quickly and earlier in the day. Plan accordingly to ensure you can secure parking. \r\n",
+              "language": "en"
+            }
+          ]
+        },
+        "severity_level": "WARNING",
+        "url": {
+          "translation": [
+            {
+              "text": "https://www.soundtransit.org/alerts",
+              "language": "en"
+            }
+          ]
+        },
+        "active_period": [
+          {
+            "start": 1776909600,
+            "end": 1776924000
+          }
+        ],
+        "informed_entity": [
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "100479"
+          },
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "2LINE"
+          }
+        ]
+      }
+    },
+    {
+      "id": "17314",
+      "alert": {
+        "effect": "OTHER_EFFECT",
+        "effect_detail": {
+          "translation": [
+            {
+              "text": "ANNOUNCEMENT",
+              "language": "en"
+            }
+          ]
+        },
+        "cause": "MAINTENANCE",
+        "cause_detail": {
+          "translation": [
+            {
+              "text": "MAINTENANCE_ACTIVITY",
+              "language": "en"
+            }
+          ]
+        },
+        "header_text": {
+          "translation": [
+            {
+              "text": "On Saturday, April 25, from 4 a.m. through end of service on Sunday, April 26, Shuttle buses will be replace 1 Line trains between Rainier Beach Station and Sea/Tac Airport Station due to scheduled maintenance.",
+              "language": "en"
+            }
+          ]
+        },
+        "description_text": {
+          "translation": [
+            {
+              "text": "1 Line trains will run from Lynnwood City Center Station to Rainier Beach Station and from Sea/Tac Airport Station to Federal Way Station. Tukwila Int'l Blvd Station will remain closed during this disruption.\r\n\nTrains arrivals will vary:\r\n\n-Trains from Lynnwood City Center to Int'l District/Chinatown will arrive every 5 - 10 minutes until 1 p.m. on Saturday, April 25, and until noon on Sunday, April 26, due to the 2 Line signal upgrade.\r\n-Trains from Int'l District/Chinatown to Rainier Beach will arrive every 10 minutes.\r\n-Trains from Sea/Tac Airport to Federal Way will arrive every 10 minutes.\r\n\nEvening train times will run normal weekend service: Trains will arrive every 12 minutes from 9-11 p.m. and 16 minutes from 11 p.m. to last train.\r\n\nAt Rainier Beach Station, please board all trains on the platform to Lynnwood City Center Station.\r\n\nAt Sea/Tac Airport Station, please board all trains on the platform to Federal Way Downtown Station.\r\n\nPlease follow in-station signage and train signage to ensure that you board the correct train as platforms may change due to operational needs.\r\n\nFrom Rainier Beach to SeaTac/Airport station, 1 Line Shuttle buses will arrive about every 10 minutes. Please use 1 Line Shuttle stop signs to identify where to get on and off buses.\r\n\nBelow are Shuttle bus stops for affected stations:\r\n\nRainier Beach\r\n- To Lynnwood: M.L. King Jr Wy S and S Henderson St\r\n- To Federal Way: M.L. King Jr Wy S and S Henderson St\r\n\nTukwila\r\n- To Lynnwood: Tukwila International Boulevard Station, Bay 2\r\n- To Federal Way: Tukwila International Boulevard Station, Bay 3\r\n\nSea/Tacoma Airport\r\n- To Lynnwood: Tukwila International Blvd S and S 176 St\r\n- To Federal Way: Tukwila International Blvd S and S 176 St\r\n\nWe advise passengers to plan for additional travel time. Click the link below to get more information about alternative transportation options.\r\n\n\r\n",
+              "language": "en"
+            }
+          ]
+        },
+        "severity_level": "WARNING",
+        "url": {
+          "translation": [
+            {
+              "text": "https://www.soundtransit.org/ride-with-us/changes-affect-my-ride/planned-service-disruptions",
+              "language": "en"
+            }
+          ]
+        },
+        "active_period": [
+          {
+            "start": 1777111200,
+            "end": 1777282200
+          }
+        ],
+        "informed_entity": [
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "100479"
+          }
+        ]
+      }
+    },
+    {
+      "id": "17352",
+      "alert": {
+        "effect": "DETOUR",
+        "effect_detail": {
+          "translation": [
+            {
+              "text": "LINK_SHUTTLE",
+              "language": "en"
+            }
+          ]
+        },
+        "cause": "CONSTRUCTION",
+        "cause_detail": {
+          "translation": [
+            {
+              "text": "SCHEDULED_MAINTENANCE",
+              "language": "en"
+            }
+          ]
+        },
+        "header_text": {
+          "translation": [
+            {
+              "text": "On Saturday, April 25, Sunday, April 26, and Saturday, May 2, from the start of service until noon, shuttle buses will replace 2 Line trains between Spring District and Overlake Village stations for scheduled maintenance.",
+              "language": "en"
+            }
+          ]
+        },
+        "description_text": {
+          "translation": [
+            {
+              "text": "Sound Transit is upgrading signaling equipment between Spring District and Overlake Village stations to improve system reliability.\r\n\n2 Line trains will arrive every 20 minutes between Lynnwood City Center and Spring District stations, and every 13 minutes between Overlake Village and Downtown Redmond stations.\r\n\nAt Wilburton and Spring District stations, please board all trains on the platform to Lynnwood. At Overlake Village Station, please board all trains on the platform to Downtown Redmond.\r\n\n2 Line shuttle buses will arrive about every 10 to 15 minutes.\r\n\nBelow are shuttle bus stops for affected stations:\r\n\nSpring District\r\n• To Lynnwood: 120th Ave NE & NE Spring Blvd\r\n• To Downtown Redmond: 120th Ave NE & NE Spring Blvd\r\n\nBelRed\r\n• To Lynnwood: 132nd Ave NE & NE Spring Blvd\r\n• To Downtown Redmond: 132nd Ave NE & NE Spring Blvd\r\n\nOverlake Village\r\n• To Lynnwood: 152nd Ave NE & Da Vinci Ave NE\r\n• To Downtown Redmond: 152nd Ave NE & NE Shen St",
+              "language": "en"
+            }
+          ]
+        },
+        "severity_level": "SEVERE",
+        "url": {
+          "translation": [
+            {
+              "text": "https://www.soundtransit.org/ride-with-us/changes-affect-my-ride/planned-service-disruptions",
+              "language": "en"
+            }
+          ]
+        },
+        "active_period": [
+          {
+            "start": 1777111200,
+            "end": 1777748400
+          }
+        ],
+        "informed_entity": [
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "2LINE"
+          }
+        ]
+      }
+    },
+    {
+      "id": "17383",
+      "alert": {
+        "effect": "ACCESSIBILITY_ISSUE",
+        "effect_detail": {
+          "translation": [
+            {
+              "text": "ELEVATOR_CLOSURE",
+              "language": "en"
+            }
+          ]
+        },
+        "cause": "MAINTENANCE",
+        "cause_detail": {
+          "translation": [
+            {
+              "text": "UNSCHEDULED_OUTAGE",
+              "language": "en"
+            }
+          ]
+        },
+        "header_text": {
+          "translation": [
+            {
+              "text": "Auburn Station - Pedestrian Bridge elevator unavailable until further notice due to unscheduled outage. The elevator at the C St SW Exit serving the street (Track 2) and pedestrian bridge to Track 1 is out of service.",
+              "language": "en"
+            }
+          ]
+        },
+        "description_text": {
+          "translation": [
+            {
+              "text": "To ride the Sounder:\r\n\nFrom the pedestrian bridge:\r\n\n1. Return to the Auburn Station Garage.\r\n2. Take the elevator down to the street.\r\n\nTo Track 2:\r\n\n1. Take the pedestrian walkway at Track 1 toward W Main St.\r\n2. Cross using the crosswalk at W Main St.\r\n3. Follow the pedestrian walkway to Track 2.",
+              "language": "en"
+            }
+          ]
+        },
+        "severity_level": "WARNING",
+        "url": {
+          "translation": [
+            {
+              "text": "https://SoundTransit.org/alert/st/17383",
+              "language": "en"
+            }
+          ]
+        },
+        "active_period": [
+          {
+            "start": 1776398220
+          }
+        ],
+        "informed_entity": [
+          {
+            "agency_id": "40",
+            "route_type": 2,
+            "route_id": "SNDR_TL",
+            "stop_id": "S_AU_NB"
+          },
+          {
+            "agency_id": "40",
+            "route_type": 2,
+            "route_id": "SNDR_TL",
+            "stop_id": "S_AU_SB"
+          }
+        ]
+      }
+    },
+    {
+      "id": "17401",
+      "alert": {
+        "effect": "OTHER_EFFECT",
+        "effect_detail": {
+          "translation": [
+            {
+              "text": "ANNOUNCEMENT",
+              "language": "en"
+            }
+          ]
+        },
+        "cause": "UNKNOWN_CAUSE",
+        "cause_detail": {
+          "translation": [
+            {
+              "text": "UNKNOWN_CAUSE",
+              "language": "en"
+            }
+          ]
+        },
+        "header_text": {
+          "translation": [
+            {
+              "text": "From April 28 - 30, from 10:30 p.m. to the end of service, shuttle buses will replace 2 Line trains between South Bellevue and Overlake stations.  ",
+              "language": "en"
+            }
+          ]
+        },
+        "description_text": {
+          "translation": [
+            {
+              "text": "The last Lynnwood-bound 2 Line train serving all stations will depart from Downtown Redmond Station at 10:30 p.m., reaching Lynnwood City Center Station at 11:48 p.m.  \r\n\nThe last Redmond-bound 2 Line train serving all stations will depart Lynnwood City Center at 9:16 p.m., reaching Downtown Redmond Station at 10:33 p.m. \r\n\nShuttle buses between South Bellevue Station and Overlake Station will run every 10 - 15 minutes.  \r\n\n\r\nAffected stops: \r\n\nOverlake Village\r\n•\tTo Lynnwood:  152nd Ave NE & Da Vinci Ave NE\r\n•\tTo Downtown Redmond:  152nd Ave NE & NE Shen St\r\n \r\nBel-Red\r\n•\tTo Lynnwood: 132nd Ave NE & NE Spring Blvd\r\n•\tTo Downtown Redmond: 132nd Ave NE & NE Spring Blvd\r\n \r\nSpring District\r\n•\tTo Lynnwood: 120th Ave NE & NE Spring Blvd\r\n•\tTo Downtown Redmond: 120th Ave NE & NE Spring Blvd\r\n \r\nWilburton\r\n•\tTo Lynnwood:  NE 8th St & 118th Ave NE\r\n•\tTo Downtown Redmond:  NE 8th St & NE 116th Ave NE\r\n \r\nBellevue Downtown \r\n•\tTo Lynnwood: 110th Ave NE & NE 6th St\r\n•\tTo Downtown Redmond: 110th Ave NE & NE 6th St\r\n \r\nEast Main\r\n•\tTo Lynnwood: 112th Ave SE & SE 300 Block\r\n•\tTo Downtown Redmond:  112th Ave & SE 300 Block\r\n \r\nSouth Bellevue \r\n•\tTo Lynnwood: South Bellevue Sta – Bay 1 \r\n•\tTo Downtown Redmond: South Bellevue Sta – Bay 3 \r\n\n ",
+              "language": "en"
+            }
+          ]
+        },
+        "severity_level": "SEVERE",
+        "url": {
+          "translation": [
+            {
+              "text": "https://www.soundtransit.org/ride-with-us/changes-affect-my-ride/navigating-service-disruptions#2line",
+              "language": "en"
+            }
+          ]
+        },
+        "active_period": [
+          {
+            "start": 1777440600,
+            "end": 1777627800
+          }
+        ],
+        "informed_entity": [
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "100479"
+          },
+          {
+            "agency_id": "40",
+            "route_type": 0,
+            "route_id": "2LINE"
+          }
+        ]
+      }
+    },
+    {
+      "id": "17497",
+      "alert": {
+        "effect": "ACCESSIBILITY_ISSUE",
+        "effect_detail": {
+          "translation": [
+            {
+              "text": "ELEVATOR_CLOSURE",
+              "language": "en"
+            }
+          ]
+        },
+        "cause": "MAINTENANCE",
+        "cause_detail": {
+          "translation": [
+            {
+              "text": "MAINTENANCE",
+              "language": "en"
+            }
+          ]
+        },
+        "header_text": {
+          "translation": [
+            {
+              "text": "Puyallup Station - Elevator 3 unavailable until further notice due to maintenance.",
+              "language": "en"
+            }
+          ]
+        },
+        "description_text": {
+          "translation": [
+            {
+              "text": "Passengers requiring elevator service must access ground level via elevator 1 or 2.\r\n\nTo ride the Sounder:\r\n\n1. Access ground level via elevator 1 or 2.\r\n2. Cross 5th St NW using the crosswalk at 2nd Ave NW. Passengers can also access the surface lot next to garage, which has a wheelchair accessible entrance and wheelchair accessible parking stalls upon availability.\r\n\nTo access parking garage:\r\n\n1. Access sidewalk from platform\r\n2. Cross 5th St NW using crosswalk at 2nd Ave NW\r\n3. Take elevators 1 or 2 to access garage floors.\r\n\nPlease call Sound Transit Security at 206-398-5268 to assist you.",
+              "language": "en"
+            }
+          ]
+        },
+        "severity_level": "WARNING",
+        "url": {
+          "translation": [
+            {
+              "text": "https://SoundTransit.org/alert/st/17497",
+              "language": "en"
+            }
+          ]
+        },
+        "active_period": [
+          {
+            "start": 1776865800
+          }
+        ],
+        "informed_entity": [
+          {
+            "agency_id": "40",
+            "route_type": 2,
+            "route_id": "SNDR_TL",
+            "stop_id": "S_PU_NB"
+          },
+          {
+            "agency_id": "40",
+            "route_type": 2,
+            "route_id": "SNDR_TL",
+            "stop_id": "S_PU_SB"
+          }
+        ]
+      }
+    },
+    {
+      "id": "17498",
+      "alert": {
+        "effect": "ACCESSIBILITY_ISSUE",
+        "effect_detail": {
+          "translation": [
+            {
+              "text": "ELEVATOR_CLOSURE",
+              "language": "en"
+            }
+          ]
+        },
+        "cause": "MAINTENANCE",
+        "cause_detail": {
+          "translation": [
+            {
+              "text": "MAINTENANCE",
+              "language": "en"
+            }
+          ]
+        },
+        "header_text": {
+          "translation": [
+            {
+              "text": "South Bellevue Station Garage - Elevator 1 has returned to service. ",
+              "language": "en"
+            }
+          ]
+        },
+        "description_text": {
+          "translation": [
+            {
+              "text": "",
+              "language": "en"
+            }
+          ]
+        },
+        "severity_level": "WARNING",
+        "url": {
+          "translation": [
+            {
+              "text": "https://SoundTransit.org/alert/st/17498",
+              "language": "en"
+            }
+          ]
+        },
+        "active_period": [
+          {
+            "start": 1776866040,
+            "end": 1776886200
+          }
+        ],
+        "informed_entity": [
+          {
+            "route_type": 0,
+            "route_id": "2LINE",
+            "stop_id": "E09-E-00001"
+          },
+          {
+            "route_type": 0,
+            "route_id": "2LINE",
+            "stop_id": "E09-E-00002"
+          },
+          {
+            "route_type": 0,
+            "route_id": "2LINE",
+            "stop_id": "E09-T1"
+          },
+          {
+            "route_type": 0,
+            "route_id": "2LINE",
+            "stop_id": "E09-T2"
+          }
+        ]
+      }
+    }
+  ]
+}

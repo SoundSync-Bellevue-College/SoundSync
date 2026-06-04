@@ -142,3 +142,7 @@ route_id,agency_id,route_short_name,route_long_name,route_desc,route_type,route_
 102755,1,203,,Issaquah Highlands - South Bellevue Station,3,https://kingcounty.gov/en/dept/metro/routes-and-service/schedules-and-maps/203.html,FDB71A,
 102756,1,249,,Spring District Station - South Bellevue Station,3,https://kingcounty.gov/en/dept/metro/routes-and-service/schedules-and-maps/249.html,FDB71A,
 102757,1,187,,Federal Way - Twin Lakes,3,https://kingcounty.gov/en/dept/metro/routes-and-service/schedules-and-maps/187.html,FDB71A,
+1 Line,40,1 Line,Link Light Rail: Angle Lake - Lynnwood City Center,,0,https://www.soundtransit.org/ride-with-us/routes-schedules/1-line,5C7BA2,FFFFFF
+2 Line,40,2 Line,Link Light Rail: Redmond Technology - SODO,,0,https://www.soundtransit.org/ride-with-us/routes-schedules/2-line,C0392B,FFFFFF
+Sounder-North,40,Sounder N,Sounder North: Seattle - Everett,,2,https://www.soundtransit.org/ride-with-us/routes-schedules/sounder-north-line,2B376E,FFFFFF
+Sounder-South,40,Sounder S,Sounder South: Seattle - Lakewood,,2,https://www.soundtransit.org/ride-with-us/routes-schedules/sounder-south-line,2B376E,FFFFFF
