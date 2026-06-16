@@ -30,13 +30,17 @@
     <!-- Team -->
     <section class="team-section">
       <h2 class="section-heading">Meet the Team</h2>
-      <div class="team-grid">
-        <div class="member-card" v-for="member in team" :key="member.name">
+
+      <p v-if="teamError" class="team-status">{{ teamError }}</p>
+      <p v-else-if="teamLoading" class="team-status">Loading team…</p>
+
+      <div v-else class="team-grid">
+        <div class="member-card" v-for="member in team" :key="member.id">
 
           <!-- Photo -->
           <div class="member-photo-wrap">
             <img
-              :src="member.photo"
+              :src="member.photo_url"
               :alt="member.name"
               class="member-photo"
             />
@@ -111,10 +115,37 @@
 </template>
 
 <script setup lang="ts">
-import abshiraPhoto from '@/assets/team/abshira.jpg'
-import tonyPhoto from '@/assets/team/tony.jpg'
-import nolanPhoto from '@/assets/team/nolan.jpg'
-import waynePhoto from '@/assets/team/wayne.jpg'
+import { ref, onMounted } from 'vue'
+import api from '@/services/api'
+
+interface TeamMember {
+  id: string
+  name: string
+  pronouns: string
+  role: string
+  photo_url: string
+  quote: string
+  description: string
+  linkedin: string
+  github: string
+  instagram: string
+  sort_order: number
+}
+
+const team = ref<TeamMember[]>([])
+const teamLoading = ref(true)
+const teamError = ref('')
+
+onMounted(async () => {
+  try {
+    const res = await api.get('/team')
+    team.value = res.data?.data ?? []
+  } catch (e: unknown) {
+    teamError.value = e instanceof Error ? e.message : 'Failed to load team.'
+  } finally {
+    teamLoading.value = false
+  }
+})
 
 const mission = [
   {
@@ -131,53 +162,6 @@ const mission = [
     icon: '🤝',
     title: 'Community Reporting',
     body: 'Crowdsourced cleanliness, crowding, and delay reports that keep fellow riders informed in real time.',
-  },
-]
-
-const team = [
-  {
-    name: 'Abshira',
-    pronouns: 'she/her',
-    role: 'UI Front End & Mobile',
-    photo: abshiraPhoto,
-    quote: 'Add your personal quote here.',
-    description: 'Add a short description of your responsibilities and contributions to the project here.',
-    linkedin: 'https://www.linkedin.com/in/abshira-salat-ba1829260/',
-    github: 'https://github.com/AbshiraSalat',
-    instagram: '',
-  },
-  {
-    name: 'Tony',
-    pronouns: 'he/him',
-    role: 'System DevOps, Authentication & Security',
-    photo: tonyPhoto,
-    quote: 'Add your personal quote here.',
-    description: 'Add a short description of your responsibilities and contributions to the project here.',
-    linkedin: 'https://www.linkedin.com/in/anye-che-b59624202/',
-    github: 'https://github.com/cheTonyA',
-    instagram: '',
-  },
-  {
-    name: 'Nolan',
-    pronouns: 'he/him',
-    role: 'Performance Metrics, AI Prediction Model & LLM Integration',
-    photo: nolanPhoto,
-    quote: 'Add your personal quote here.',
-    description: 'Add a short description of your responsibilities and contributions to the project here.',
-    linkedin: 'https://www.linkedin.com/in/nolan-ngo-2b3304203/',
-    github: 'https://github.com/nolngo',
-    instagram: '',
-  },
-  {
-    name: 'Wayne',
-    pronouns: 'he/him',
-    role: 'Backend, Testing, API & Database Management',
-    photo: waynePhoto,
-    quote: 'Add your personal quote here.',
-    description: 'Add a short description of your responsibilities and contributions to the project here.',
-    linkedin: 'https://www.linkedin.com/in/thu-san/',
-    github: 'https://github.com/waynesan41',
-    instagram: '',
   },
 ]
 </script>
@@ -282,6 +266,12 @@ const team = [
   color: var(--color-text);
   margin-bottom: 1.25rem;
   text-align: center;
+}
+
+.team-status {
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
 }
 
 .team-grid {
