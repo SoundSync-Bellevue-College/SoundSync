@@ -314,10 +314,20 @@ async function send() {
   cursor: default;
 }
 
-/* Hide on mobile — the native app has a dedicated Assistant tab */
 @media (max-width: 768px) {
   .chatbot-wrapper {
-    display: none;
+    right: auto;
+    left: 1rem;
+    bottom: auto;
+    top: 70px;
+    z-index: 50;
+    align-items: flex-start;
+    flex-direction: column-reverse;
+  }
+
+  .chat-window {
+    width: calc(100vw - 2rem);
+    max-height: 60vh;
   }
 }
 
