@@ -210,6 +210,7 @@ import RouteDetailModal from './RouteDetailModal.vue'
 
 const props = defineProps<{
   pendingDestination?: { name: string; lat: number; lng: number } | null
+  pendingOrigin?: { name: string; lat: number; lng: number } | null
 }>()
 
 const routeStore = useRouteStore()
@@ -420,6 +421,17 @@ watch(() => props.pendingDestination, (dest) => {
   }
   destSaved.value = false
   emit('destination-applied')
+})
+
+watch(() => props.pendingOrigin, (orig) => {
+  if (!orig || !originInputEl.value) return
+  originInputEl.value.value = orig.name
+  originPlace = {
+    name: orig.name,
+    formatted_address: orig.name,
+    geometry: { location: new google.maps.LatLng(orig.lat, orig.lng) },
+  }
+  usingCurrentLocation.value = false
 })
 
 onMounted(async () => {

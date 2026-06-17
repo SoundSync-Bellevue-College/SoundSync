@@ -56,7 +56,7 @@
 
       <!-- Tab content -->
       <div class="tab-content" ref="tabContentEl" @scroll.passive="onTabScroll" @touchstart.passive="onContentTouchStart" @touchmove="onContentTouchMove">
-        <RouteSearchPanel v-show="activeTab === 'plan'" @view-on-map="sheetOpen = false" :pending-destination="pendingDestination" @destination-applied="pendingDestination = null" />
+        <RouteSearchPanel v-show="activeTab === 'plan'" @view-on-map="sheetOpen = false" :pending-destination="pendingDestination" :pending-origin="pendingOrigin" @destination-applied="pendingDestination = null; pendingOrigin = null" />
         <RouteTrackPanel  v-show="activeTab === 'track'" />
         <WeatherWidget    v-show="activeTab === 'weather'" />
       </div>
@@ -126,7 +126,7 @@
     <div v-if="sheetOpen" class="sheet-backdrop" @click="sheetOpen = false"></div>
 
     <!-- Transit assistant chatbot -->
-    <ChatBot />
+    <ChatBot @plan-route="handleChatRoute" />
 
     <!-- First-time tutorial callout -->
     <Transition name="tutorial-fade">
@@ -164,6 +164,7 @@ const sheetOpen = ref(false)
 const sheetHalf = ref(false)
 const activeTab = ref<'plan' | 'track' | 'weather'>('plan')
 const pendingDestination = ref<{ name: string; lat: number; lng: number } | null>(null)
+const pendingOrigin = ref<{ name: string; lat: number; lng: number } | null>(null)
 const tabContentEl = ref<HTMLElement | null>(null)
 
 const tutorialStep = ref(0)
@@ -217,6 +218,13 @@ function onContentTouchMove(e: TouchEvent) {
     sheetOpen.value = false
     sheetHalf.value = false
   }
+}
+
+function handleChatRoute(payload: { origin: { name: string; lat: number; lng: number }; destination: { name: string; lat: number; lng: number } }) {
+  pendingOrigin.value = payload.origin
+  pendingDestination.value = payload.destination
+  activeTab.value = 'plan'
+  sheetOpen.value = true
 }
 
 function handleSetDestination(payload: { name: string; lat: number; lng: number }) {
