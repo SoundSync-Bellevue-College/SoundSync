@@ -144,6 +144,11 @@
       <p class="footer-links">
         <RouterLink to="/privacy" class="footer-link">Privacy Policy</RouterLink>
       </p>
+      <p class="footer-links">
+        <button class="tutorial-reset-btn" @click="resetTutorial" :class="{ done: resetDone }">
+          {{ resetDone ? '✓ Tutorial will show on next visit' : '? Reset app tutorial' }}
+        </button>
+      </p>
     </section>
 
   </div>
@@ -152,6 +157,14 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import api from '@/services/api'
+
+const resetDone = ref(false)
+
+function resetTutorial() {
+  localStorage.removeItem('soundsync_tutorial_seen')
+  resetDone.value = true
+  setTimeout(() => { resetDone.value = false }, 3000)
+}
 
 interface TeamMember {
   id: string
@@ -202,10 +215,8 @@ const mission = [
 </script>
 
 <style scoped>
-/* Root scrolls within the fixed-height main-content container */
 .about-page {
-  height: 100%;
-  overflow-y: auto;
+  min-height: 100%;
 }
 
 .about-inner {
@@ -456,6 +467,28 @@ const mission = [
 
 .footer-link:hover {
   color: var(--color-primary);
+}
+
+.tutorial-reset-btn {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  padding: 0.35rem 0.75rem;
+  cursor: pointer;
+  width: auto;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tutorial-reset-btn:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+}
+
+.tutorial-reset-btn.done {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
 }
 
 /* ── Download section ────────────────────────────────────────────────────── */

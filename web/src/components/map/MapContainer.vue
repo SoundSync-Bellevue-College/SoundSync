@@ -166,12 +166,17 @@ const mapStore = useMapStore()
 const routeStore = useRouteStore()
 const serviceAlertStore = useServiceAlertStore()
 
+const emit = defineEmits<{
+  'set-destination': [payload: { name: string; lat: number; lng: number }]
+}>()
+
 const reportVehicle = ref<VehiclePosition | null>(null)
 const showLegend = ref(false)
 const overlayOpen = ref(false)
 const layersFabWrap = ref<HTMLElement | null>(null)
 const locatingUser = ref(false)
 let userLocationMarker: google.maps.Marker | null = null
+let poiInfoWindow: google.maps.InfoWindow | null = null
 
 async function goToCurrentLocation() {
   if (!map.value || !('geolocation' in navigator) || locatingUser.value) return
@@ -399,6 +404,7 @@ onMounted(async () => {
     styles: mapStore.mapTypeId === 'roadmap' ? darkMapStyles : [],
     disableDefaultUI: true,
     zoomControl: window.innerWidth > 768,
+    gestureHandling: 'greedy',
   })
 
   transitLayer = new google.maps.TransitLayer()
@@ -420,6 +426,85 @@ onMounted(async () => {
     } else {
       mapStore.nearbyStops = []
     }
+  })
+
+  // Intercept POI clicks — replace "View on Google Maps" with "Set destination"
+  poiInfoWindow = new google.maps.InfoWindow()
+  map.value.addListener('click', (event: google.maps.MapMouseEvent & { placeId?: string }) => {
+    if (!event.placeId) return
+    event.stop?.()
+
+    const location = event.latLng
+    if (!location) return
+
+    const service = new google.maps.places.PlacesService(map.value!)
+    service.getDetails(
+      { placeId: event.placeId, fields: ['name', 'formatted_address', 'geometry'] },
+      (place, status) => {
+        if (status !== google.maps.places.PlacesServiceStatus.OK || !place) return
+
+        const name = place.name ?? ''
+        const address = place.formatted_address ?? ''
+        const lat = place.geometry?.location?.lat() ?? location.lat()
+        const lng = place.geometry?.location?.lng() ?? location.lng()
+
+        const cs = getComputedStyle(document.documentElement)
+        const bg      = cs.getPropertyValue('--color-surface').trim()
+        const text    = cs.getPropertyValue('--color-text').trim()
+        const muted   = cs.getPropertyValue('--color-text-muted').trim()
+        const border  = cs.getPropertyValue('--color-border').trim()
+        const primary = cs.getPropertyValue('--color-primary').trim()
+
+        const content = `
+          <div style="font-family:sans-serif;padding:6px 6px 6px;min-width:160px;max-width:220px;background:${bg};">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;margin-bottom:2px;">
+              <div style="font-weight:600;font-size:0.8rem;color:${text};line-height:1.3">${name}</div>
+              <button id="poi-close" style="background:none;border:none;color:${muted};font-size:0.85rem;cursor:pointer;padding:0;line-height:1;flex-shrink:0;margin-top:1px">✕</button>
+            </div>
+            <div style="font-size:0.72rem;color:${muted};margin-bottom:6px">${address}</div>
+            <button
+              id="poi-set-dest"
+              style="background:${primary};color:#fff;border:none;border-radius:5px;padding:5px 10px;font-size:0.75rem;font-weight:500;cursor:pointer;width:100%"
+            >Set destination</button>
+          </div>`
+
+        poiInfoWindow!.setContent(content)
+        poiInfoWindow!.setPosition(location)
+        poiInfoWindow!.open(map.value)
+
+        google.maps.event.addListenerOnce(poiInfoWindow!, 'domready', () => {
+          // Strip Google's built-in InfoWindow chrome
+          const iwInner = document.querySelector('.gm-style-iw-c') as HTMLElement | null
+          const iwOuter = document.querySelector('.gm-style-iw-d') as HTMLElement | null
+          const iwTail  = document.querySelector('.gm-style-iw-tc') as HTMLElement | null
+          if (iwInner) {
+            iwInner.style.cssText += 'padding:0!important;box-shadow:none!important;'
+          }
+          if (iwOuter) {
+            iwOuter.style.cssText += 'overflow:hidden!important;padding:0!important;max-height:none!important;'
+          }
+          if (iwTail) iwTail.style.display = 'none'
+
+          // Hide Google's default close button (it reserves top space even when hidden)
+          const defaultClose = document.querySelector('.gm-ui-hover-effect') as HTMLElement | null
+          if (defaultClose) {
+            defaultClose.style.cssText += 'display:none!important;width:0!important;height:0!important;'
+          }
+          // Also collapse the wrapper that pads for the close button
+          const iwChrome = document.querySelector('.gm-style-iw-chr') as HTMLElement | null
+          if (iwChrome) iwChrome.style.cssText += 'display:none!important;height:0!important;'
+
+          document.getElementById('poi-close')?.addEventListener('click', () => {
+            poiInfoWindow!.close()
+          })
+
+          document.getElementById('poi-set-dest')?.addEventListener('click', () => {
+            poiInfoWindow!.close()
+            emit('set-destination', { name: name || address, lat, lng })
+          })
+        })
+      },
+    )
   })
 
   mapReady.value = true

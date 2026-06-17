@@ -138,8 +138,24 @@
         <button class="btn-ghost sign-out-btn" @click="handleLogout">Sign out</button>
       </template>
       <template v-else>
-        <RouterLink to="/login" class="btn-ghost">Sign in</RouterLink>
-        <RouterLink to="/register" class="btn-primary">Register</RouterLink>
+        <!-- Desktop: text buttons -->
+        <RouterLink to="/login" class="btn-ghost auth-desktop">Sign in</RouterLink>
+        <RouterLink to="/register" class="btn-primary auth-desktop">Register</RouterLink>
+
+        <!-- Mobile: user icon + dropdown -->
+        <div class="auth-menu-wrap" @click.stop>
+          <button class="account-icon-btn" @click.stop="authMenuOpen = !authMenuOpen" aria-label="Sign in">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+              fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+          </button>
+          <div v-if="authMenuOpen" class="auth-dropdown">
+            <RouterLink to="/login" class="menu-link" @click="authMenuOpen = false">Sign in</RouterLink>
+            <RouterLink to="/register" class="menu-link" @click="authMenuOpen = false">Register</RouterLink>
+          </div>
+        </div>
       </template>
     </div>
   </header>
@@ -160,6 +176,7 @@ const router = useRouter()
 
 const dropdownOpen = ref(false)
 const menuOpen = ref(false)
+const authMenuOpen = ref(false)
 
 function toggleDropdown() {
   dropdownOpen.value = !dropdownOpen.value
@@ -168,6 +185,7 @@ function toggleDropdown() {
 function handleClickOutside() {
   dropdownOpen.value = false
   menuOpen.value = false
+  authMenuOpen.value = false
 }
 
 onMounted(() => document.addEventListener('click', handleClickOutside))
@@ -208,7 +226,8 @@ function formatTime(iso: string): string {
   border-bottom: 1px solid var(--color-border);
   gap: 1.5rem;
   z-index: 100;
-  position: relative;
+  position: sticky;
+  top: 0;
 }
 
 .header-left {
@@ -586,6 +605,28 @@ function formatTime(iso: string): string {
   margin-top: 0.25rem;
 }
 
+/* ─── Auth menu (mobile user icon + dropdown) ───────────────────────────────── */
+
+.auth-menu-wrap {
+  display: none;
+  position: relative;
+}
+
+.auth-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 140px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  z-index: 200;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
 /* ── Mobile ─────────────────────────────────────────────────────────────────── */
 
 @media (max-width: 600px) {
@@ -643,6 +684,14 @@ function formatTime(iso: string): string {
   .header-actions {
     gap: 0.4rem;
     margin-left: auto;
+  }
+
+  .auth-desktop {
+    display: none;
+  }
+
+  .auth-menu-wrap {
+    display: block;
   }
 }
 </style>
