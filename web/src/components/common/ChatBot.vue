@@ -314,6 +314,13 @@ async function send() {
   cursor: default;
 }
 
+/* Hide on mobile — the native app has a dedicated Assistant tab */
+@media (max-width: 768px) {
+  .chatbot-wrapper {
+    display: none;
+  }
+}
+
 /* Slide transition */
 .chat-slide-enter-active,
 .chat-slide-leave-active {
