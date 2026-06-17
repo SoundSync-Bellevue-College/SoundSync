@@ -201,7 +201,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRouteStore } from '@/stores/routeStore'
 import { useAuthStore } from '@/stores/authStore'
 import { loadGoogleMaps } from '@/services/mapsService'
@@ -210,6 +210,7 @@ import RouteDetailModal from './RouteDetailModal.vue'
 
 const props = defineProps<{
   pendingDestination?: { name: string; lat: number; lng: number } | null
+  pendingOrigin?: { name: string; lat: number; lng: number } | null
 }>()
 
 const routeStore = useRouteStore()
@@ -420,6 +421,21 @@ watch(() => props.pendingDestination, (dest) => {
   }
   destSaved.value = false
   emit('destination-applied')
+})
+
+watch(() => props.pendingOrigin, (orig) => {
+  if (!orig || !originInputEl.value) return
+  originInputEl.value.value = orig.name
+  originPlace = {
+    name: orig.name,
+    formatted_address: orig.name,
+    geometry: { location: new google.maps.LatLng(orig.lat, orig.lng) },
+  }
+  usingCurrentLocation.value = false
+  // Auto-trigger directions once both origin and destination are ready
+  if (props.pendingDestination) {
+    nextTick(() => planRoute())
+  }
 })
 
 onMounted(async () => {

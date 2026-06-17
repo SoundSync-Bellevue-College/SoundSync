@@ -55,11 +55,19 @@
 <script setup lang="ts">
 import { ref, nextTick } from 'vue'
 import api from '@/services/api'
+import { geocodeAddress } from '@/services/mapsService'
 
 interface Message {
   role: 'user' | 'assistant'
   content: string
 }
+
+interface RoutePayload {
+  origin: { name: string; lat: number; lng: number }
+  destination: { name: string; lat: number; lng: number }
+}
+
+const emit = defineEmits<{ 'plan-route': [RoutePayload] }>()
 
 const isOpen = ref(false)
 const draft = ref('')
@@ -86,6 +94,19 @@ async function send() {
   try {
     const { data } = await api.post('/chat', { messages: messages.value })
     messages.value.push({ role: 'assistant', content: data.message })
+
+    if (data.route) {
+      const [originCoords, destCoords] = await Promise.all([
+        geocodeAddress(data.route.origin),
+        geocodeAddress(data.route.destination),
+      ])
+      if (originCoords && destCoords) {
+        emit('plan-route', {
+          origin: { name: data.route.origin, ...originCoords },
+          destination: { name: data.route.destination, ...destCoords },
+        })
+      }
+    }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Something went wrong. Please try again.'
     messages.value.push({ role: 'assistant', content: msg })

@@ -6,9 +6,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
+	"strings"
 
 	"soundsync/api/internal/config"
 )
+
+var routeJSONRe = regexp.MustCompile(`(?m)\{"_route":\{"origin":"([^"]+)","destination":"([^"]+)"\}\}\s*$`)
 
 const anthropicMessagesURL = "https://api.anthropic.com/v1/messages"
 const chatModel = "claude-haiku-4-5-20251001"
@@ -25,7 +29,10 @@ When helping with trip planning:
 - Remind riders to check real-time arrivals for current schedules
 - Be concise and friendly
 
-If asked about something outside transit or the Seattle/Bellevue area, politely redirect to transit topics.`
+If asked about something outside transit or the Seattle/Bellevue area, politely redirect to transit topics.
+
+IMPORTANT: When the user clearly states a trip with both an origin AND a destination (e.g. "from X to Y", "I want to go to Y from X", "navigate from X to Y"), append this exact JSON on its own line at the very end of your response, with no extra text after it:
+{"_route":{"origin":"<origin place name>","destination":"<destination place name>"}}`
 
 type chatMessage struct {
 	Role    string `json:"role"`
@@ -117,8 +124,20 @@ func (h *ChatHandler) Chat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jsonOK(w, map[string]interface{}{
-		"message": anthropicResp.Content[0].Text,
+	text := anthropicResp.Content[0].Text
+
+	// Extract _route JSON if Claude appended it, then strip it from the message
+	out := map[string]interface{}{
+		"message": text,
 		"role":    "assistant",
-	}, http.StatusOK)
+	}
+	if m := routeJSONRe.FindStringSubmatch(text); len(m) == 3 {
+		out["message"] = strings.TrimSpace(routeJSONRe.ReplaceAllString(text, ""))
+		out["route"] = map[string]string{
+			"origin":      m[1],
+			"destination": m[2],
+		}
+	}
+
+	jsonOK(w, out, http.StatusOK)
 }
