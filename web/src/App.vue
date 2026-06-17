@@ -58,8 +58,13 @@ body,
   transition: background-color 0.2s, color 0.2s;
 }
 
+body {
+  overflow-y: hidden;
+}
+
 .main-content {
   height: calc(100vh - 60px);
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 </style>

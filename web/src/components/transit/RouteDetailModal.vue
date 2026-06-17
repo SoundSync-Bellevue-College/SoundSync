@@ -164,7 +164,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { weatherService } from '@/services/weatherService'
 import { useAuthStore } from '@/stores/authStore'
 import { useRouteStore } from '@/stores/routeStore'
@@ -182,7 +182,30 @@ const props = defineProps<{
   result: google.maps.DirectionsResult
 }>()
 
-defineEmits<{ close: [], select: [] }>()
+const emit = defineEmits<{ close: [], select: [] }>()
+
+// ── Android back-gesture / browser back button support ────────────────────────
+let historyPushed = false
+
+function onPopState() {
+  historyPushed = false
+  emit('close')
+}
+
+onMounted(() => {
+  history.pushState({ routeDetailOpen: true }, '')
+  historyPushed = true
+  window.addEventListener('popstate', onPopState)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('popstate', onPopState)
+  // If modal was closed by ✕ / backdrop (not back gesture), pop the state we pushed
+  if (historyPushed) {
+    historyPushed = false
+    history.back()
+  }
+})
 
 const leg = computed(() => props.result.routes[routeStore.selectedRouteIndex]?.legs[0])
 
@@ -596,7 +619,8 @@ const fareBreakdown = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
-  min-width: 160px;
+  min-width: 0;
+  flex-shrink: 1;
 }
 
 .fare-line {
@@ -605,6 +629,18 @@ const fareBreakdown = computed(() => {
   align-items: center;
   font-size: 0.8rem;
   color: var(--color-text-muted);
+  gap: 0.5rem;
+}
+
+@media (max-width: 480px) {
+  .modal-footer {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .fare-breakdown {
+    width: 100%;
+  }
 }
 
 .fare-mode {
@@ -630,5 +666,24 @@ const fareBreakdown = computed(() => {
   padding-top: 0.2rem;
   font-weight: 700;
   color: var(--color-text);
+}
+
+@media (max-width: 768px) {
+  .modal-backdrop {
+    padding: 0.5rem;
+  }
+
+  .timeline {
+    padding: 0.75rem 0.75rem;
+  }
+
+  .tl-row {
+    grid-template-columns: 3rem 1.25rem 1fr;
+  }
+
+  .tl-time {
+    padding-right: 0.35rem;
+    font-size: 0.68rem;
+  }
 }
 </style>

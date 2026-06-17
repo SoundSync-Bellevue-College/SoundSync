@@ -31,14 +31,7 @@
     <!-- To field -->
     <div class="field">
       <label class="field-label">To</label>
-      <div class="input-wrap">
-        <input
-          ref="destInputEl"
-          class="field-input"
-          type="text"
-          placeholder="Destination…"
-          autocomplete="off"
-        />
+      <div class="dest-row">
         <button
           v-if="auth.isLoggedIn && destPlace"
           class="btn-heart"
@@ -47,6 +40,21 @@
           :disabled="savingDest"
           @click="saveDestination"
         >{{ destSaved ? '♥' : '♡' }}</button>
+        <div class="input-wrap">
+          <input
+            ref="destInputEl"
+            class="field-input"
+            type="text"
+            placeholder="Destination…"
+            autocomplete="off"
+          />
+        </div>
+        <button
+          v-if="showClearDest"
+          class="btn-clear-dest"
+          title="Clear destination"
+          @click="clearDestination"
+        >✕</button>
       </div>
 
       <!-- Saved location chips -->
@@ -65,70 +73,89 @@
 
     <!-- Time options -->
     <div class="time-section">
-      <!-- Depart / Arrive toggle — hidden when Leave now is checked -->
-      <div v-if="!leaveNow" class="time-toggle">
+      <!-- Leave Now / Schedule Trip toggle -->
+      <div class="trip-mode-toggle">
         <button
           class="toggle-btn"
-          :class="{ active: timeType === 'depart' }"
-          @click="timeType = 'depart'"
-        >Depart at</button>
+          :class="{ active: tripMode === 'now' }"
+          @click="tripMode = 'now'"
+        >Leave Now</button>
         <button
           class="toggle-btn"
-          :class="{ active: timeType === 'arrive' }"
-          @click="timeType = 'arrive'"
-        >Arrive by</button>
+          :class="{ active: tripMode === 'schedule' }"
+          @click="tripMode = 'schedule'"
+        >Schedule Trip</button>
       </div>
 
-      <!-- Date + time row — hidden when Leave now is checked -->
-      <div v-if="!leaveNow" class="datetime-row">
-        <!-- Date selector -->
-        <div class="date-pill" @click="openDatePicker" title="Select date">
-          <span class="date-pill-text">{{ formattedDate }}</span>
-          <span class="pill-arrow">▾</span>
-          <!-- Native date input hidden beneath the pill; triggered by click -->
-          <input
-            ref="dateInputEl"
-            class="hidden-date-input"
-            type="date"
-            v-model="selectedDate"
-            :min="todayStr"
-          />
+      <!-- Depart / Arrive + date/time — only shown when scheduling -->
+      <template v-if="tripMode === 'schedule'">
+        <div class="time-toggle">
+          <button
+            class="toggle-btn"
+            :class="{ active: timeType === 'depart' }"
+            @click="timeType = 'depart'"
+          >Depart at</button>
+          <button
+            class="toggle-btn"
+            :class="{ active: timeType === 'arrive' }"
+            @click="timeType = 'arrive'"
+          >Arrive by</button>
         </div>
 
-        <!-- Time selector -->
-        <div class="time-pill">
-          <select class="time-select" v-model="selectedHour" aria-label="Hour">
-            <option v-for="h in hours" :key="h" :value="h">{{ h }}</option>
-          </select>
-          <span class="time-colon">:</span>
-          <select class="time-select" v-model="selectedMinute" aria-label="Minute">
-            <option v-for="m in minutes" :key="m" :value="m">{{ m }}</option>
-          </select>
-          <div class="ampm-toggle">
-            <button
-              class="ampm-btn"
-              :class="{ active: selectedAmPm === 'AM' }"
-              @click="selectedAmPm = 'AM'"
-            >AM</button>
-            <button
-              class="ampm-btn"
-              :class="{ active: selectedAmPm === 'PM' }"
-              @click="selectedAmPm = 'PM'"
-            >PM</button>
+        <div class="datetime-row">
+          <div class="date-pill" @click="openDatePicker" title="Select date">
+            <span class="date-pill-text">{{ formattedDate }}</span>
+            <span class="pill-arrow">▾</span>
+            <input
+              ref="dateInputEl"
+              class="hidden-date-input"
+              type="date"
+              v-model="selectedDate"
+              :min="todayStr"
+            />
+          </div>
+
+          <div class="time-pill">
+            <select class="time-select" v-model="selectedHour" aria-label="Hour">
+              <option v-for="h in hours" :key="h" :value="h">{{ h }}</option>
+            </select>
+            <span class="time-colon">:</span>
+            <select class="time-select" v-model="selectedMinute" aria-label="Minute">
+              <option v-for="m in minutes" :key="m" :value="m">{{ m }}</option>
+            </select>
+            <div class="ampm-toggle">
+              <button
+                class="ampm-btn"
+                :class="{ active: selectedAmPm === 'AM' }"
+                @click="selectedAmPm = 'AM'"
+              >AM</button>
+              <button
+                class="ampm-btn"
+                :class="{ active: selectedAmPm === 'PM' }"
+                @click="selectedAmPm = 'PM'"
+              >PM</button>
+            </div>
           </div>
         </div>
-      </div>
-
-      <!-- Leave now checkbox — always below the date/time inputs -->
-      <label class="leave-now-label">
-        <input type="checkbox" v-model="leaveNow" />
-        Leave now
-      </label>
+      </template>
     </div>
 
     <!-- Transit options -->
     <div class="transit-options">
-      <div class="options-row">
+      <button class="options-toggle" @click="routeOptionsOpen = !routeOptionsOpen">
+        <span>Route Options</span>
+        <svg
+          class="options-chevron"
+          :class="{ open: routeOptionsOpen }"
+          xmlns="http://www.w3.org/2000/svg" width="14" height="14"
+          viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+        >
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
+
+      <div v-if="routeOptionsOpen" class="options-row">
         <div class="options-col">
           <div class="options-label">Prefer</div>
           <label class="option-item" v-for="mode in transitModes" :key="mode.value">
@@ -141,7 +168,11 @@
           <div class="options-label">Routes</div>
           <label class="option-item" v-for="pref in routePreferences" :key="pref.value">
             <input type="radio" name="route-pref" :value="pref.value" v-model="selectedPreference" />
-            <span>{{ pref.label }}</span>
+            <span v-if="pref.value !== 'WHEELCHAIR'">{{ pref.label }}</span>
+            <span v-else class="wheelchair-label" :title="pref.label">
+              <span class="wheelchair-badge">♿</span>
+              Accessible
+            </span>
           </label>
         </div>
       </div>
@@ -170,18 +201,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouteStore } from '@/stores/routeStore'
 import { useAuthStore } from '@/stores/authStore'
 import { loadGoogleMaps } from '@/services/mapsService'
 import RouteSummaryCard from './RouteSummaryCard.vue'
 import RouteDetailModal from './RouteDetailModal.vue'
 
+const props = defineProps<{
+  pendingDestination?: { name: string; lat: number; lng: number } | null
+}>()
+
 const routeStore = useRouteStore()
 const auth = useAuthStore()
 const isPlanning = ref(false)
 
-const emit = defineEmits<{ 'view-on-map': [] }>()
+const emit = defineEmits<{
+  'view-on-map': []
+  'destination-applied': []
+}>()
 
 function onSelectRoute() {
   showDetail.value = false
@@ -283,8 +321,10 @@ const destInputEl = ref<HTMLInputElement | null>(null)
 // ── Time selection state ──────────────────────────────────────────────────────
 
 type TimeType = 'depart' | 'arrive'
+type TripMode = 'now' | 'schedule'
 const timeType = ref<TimeType>('depart')
-const leaveNow = ref(false)
+const tripMode = ref<TripMode>('now')
+const routeOptionsOpen = ref(false)
 
 // Date — default to today
 const todayStr = new Date().toISOString().slice(0, 10)
@@ -349,7 +389,7 @@ const formattedDate = computed(() => {
 })
 
 function buildTransitTime(): Date {
-  if (leaveNow.value) return new Date()
+  if (tripMode.value === 'now') return new Date()
   const d = new Date(selectedDate.value + 'T00:00:00')
   let h = parseInt(selectedHour.value, 10)
   if (selectedAmPm.value === 'PM' && h !== 12) h += 12
@@ -369,6 +409,18 @@ const AC_OPTIONS: google.maps.places.AutocompleteOptions = {
   fields: ['geometry', 'name', 'formatted_address'],
   componentRestrictions: { country: 'us' },
 }
+
+watch(() => props.pendingDestination, (dest) => {
+  if (!dest || !destInputEl.value) return
+  destInputEl.value.value = dest.name
+  destPlace.value = {
+    name: dest.name,
+    formatted_address: dest.name,
+    geometry: { location: new google.maps.LatLng(dest.lat, dest.lng) },
+  }
+  destSaved.value = false
+  emit('destination-applied')
+})
 
 onMounted(async () => {
   await loadGoogleMaps()
@@ -390,6 +442,15 @@ onMounted(async () => {
   // Auto-fill From with current location on load
   useCurrentLocation()
 })
+
+const showClearDest = computed(() => !!destPlace.value || !!routeStore.directionsResult)
+
+function clearDestination() {
+  if (destInputEl.value) destInputEl.value.value = ''
+  destPlace.value = null
+  destSaved.value = false
+  routeStore.clearPlan()
+}
 
 function swapPlaces() {
   if (!originInputEl.value || !destInputEl.value) return
@@ -513,7 +574,7 @@ function planRoute() {
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  padding: 0.5rem 2rem 0.5rem 0.6rem;
+  padding: 0.5rem 0.6rem;
   color: var(--color-text);
   font-size: 0.875rem;
   transition: border-color 0.15s;
@@ -524,14 +585,38 @@ function planRoute() {
   border-color: var(--color-primary);
 }
 
-.from-row {
+.from-row,
+.dest-row {
   display: flex;
   gap: 0.4rem;
   align-items: center;
 }
 
-.from-row .input-wrap {
+.from-row .input-wrap,
+.dest-row .input-wrap {
   flex: 1;
+}
+
+.btn-clear-dest {
+  flex-shrink: 0;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.btn-clear-dest:hover {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 8%, var(--color-bg));
 }
 
 .btn-swap {
@@ -561,6 +646,14 @@ function planRoute() {
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
+}
+
+/* Leave Now / Schedule Trip top toggle */
+.trip-mode-toggle {
+  display: flex;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
 }
 
 /* Depart / Arrive toggle */
@@ -710,17 +803,6 @@ function planRoute() {
   color: #fff;
 }
 
-/* Leave now checkbox */
-.leave-now-label {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.8rem;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  user-select: none;
-}
-
 /* ── Plan button ─────────────────────────────────────────────────────────── */
 
 .btn-plan {
@@ -754,10 +836,43 @@ function planRoute() {
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  padding: 0.6rem 0.75rem;
+  overflow: hidden;
+}
+
+.options-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: color 0.15s, background 0.15s;
+}
+
+.options-toggle:hover {
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-primary) 6%, transparent);
+}
+
+.options-chevron {
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.options-chevron.open {
+  transform: rotate(180deg);
 }
 
 .options-row {
+  padding: 0.6rem 0.75rem 0.6rem;
+  border-top: 1px solid var(--color-border);
   display: flex;
   gap: 0.5rem;
 }
@@ -792,6 +907,18 @@ function planRoute() {
   color: var(--color-text);
   cursor: pointer;
   user-select: none;
+}
+
+.wheelchair-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.wheelchair-badge {
+  font-size: 0.9rem;
+  line-height: 1;
+  flex-shrink: 0;
 }
 
 .option-item input[type='checkbox'],
@@ -843,24 +970,31 @@ function planRoute() {
 /* ── Heart save button ────────────────────────────────────────────────────── */
 
 .btn-heart {
-  position: absolute;
-  right: 0.5rem;
-  background: none;
-  border: none;
+  flex-shrink: 0;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 1rem;
   line-height: 1;
   color: var(--color-text-muted);
   cursor: pointer;
-  padding: 0.1rem;
-  transition: color 0.15s, transform 0.1s;
+  transition: color 0.15s, border-color 0.15s;
 }
 
 .btn-heart:hover {
   color: var(--color-danger);
+  border-color: var(--color-danger);
 }
 
 .btn-heart.saved {
   color: var(--color-danger);
+  border-color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 8%, var(--color-bg));
 }
 
 .btn-heart.saving {
