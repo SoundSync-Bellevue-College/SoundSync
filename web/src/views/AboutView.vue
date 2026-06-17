@@ -7,7 +7,7 @@
         <div class="hero-badge">Bellevue College · Senior Capstone Project</div>
         <h1 class="hero-title">Improving Public Transit<br>in King County</h1>
         <p class="hero-desc">
-          SoundSyncAI is a student-built platform created by four Bellevue College students
+          SoundSync is a student-built platform created by four Bellevue College students
           passionate about making public transportation more accessible, transparent, and
           data-driven for everyone in the King County area. We combine real-time transit data,
           crowdsourced reporting, and predictive analytics to help riders make smarter decisions
@@ -23,6 +23,41 @@
           <span class="mission-icon">{{ m.icon }}</span>
           <h3 class="mission-title">{{ m.title }}</h3>
           <p class="mission-body">{{ m.body }}</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Download the App -->
+    <section class="download-section">
+      <h2 class="section-heading">Get the App</h2>
+      <p class="download-desc">Take SoundSync with you — real-time transit tracking on your phone.</p>
+      <div class="store-badges">
+        <!-- Android -->
+        <a
+          href="https://play.google.com/store/apps/details?id=live.soundsync.app"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="store-badge android"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M3.18 23.76c.3.17.64.22.98.15l12.23-7.07-2.67-2.67-10.54 9.59zM.5 1.4C.19 1.72 0 2.22 0 2.89v18.22c0 .67.19 1.17.5 1.49l.08.07 10.21-10.2v-.24L.58 1.33.5 1.4zM20.27 10.3l-2.91-1.68-3 2.99 3 3 2.94-1.7c.84-.48.84-1.27-.03-1.61zM4.16.24L16.39 7.3 13.72 10 3.18.41A1.2 1.2 0 0 1 4.16.24z"/>
+          </svg>
+          <div class="badge-text">
+            <span class="badge-sub">Get it on</span>
+            <span class="badge-main">Google Play</span>
+          </div>
+        </a>
+
+        <!-- iOS -->
+        <div class="store-badge ios coming-soon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+          </svg>
+          <div class="badge-text">
+            <span class="badge-sub">Coming soon on</span>
+            <span class="badge-main">App Store</span>
+          </div>
+          <span class="coming-soon-chip">Soon</span>
         </div>
       </div>
     </section>
@@ -264,6 +299,7 @@ const mission = [
   font-size: 2rem;
   font-weight: 800;
   color: var(--color-text);
+  margin-top: 2rem;
   margin-bottom: 1.25rem;
   text-align: center;
 }
@@ -420,6 +456,84 @@ const mission = [
 
 .footer-link:hover {
   color: var(--color-primary);
+}
+
+/* ── Download section ────────────────────────────────────────────────────── */
+
+.download-section {
+  text-align: center;
+  padding: 0 1rem;
+}
+
+.download-desc {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  margin-bottom: 1.5rem;
+}
+
+.store-badges {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.store-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 1.25rem;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  text-decoration: none;
+  color: var(--color-text);
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+  position: relative;
+  min-width: 180px;
+}
+
+.store-badge.android:hover {
+  border-color: #34a853;
+  box-shadow: 0 4px 16px rgba(52, 168, 83, 0.2);
+  transform: translateY(-2px);
+}
+
+.store-badge.ios.coming-soon {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.badge-text {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.badge-sub {
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  line-height: 1.2;
+}
+
+.badge-main {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.coming-soon-chip {
+  position: absolute;
+  top: -8px;
+  right: 10px;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 /* ── Tablet (≤ 900px) ────────────────────────────────────────────────────── */

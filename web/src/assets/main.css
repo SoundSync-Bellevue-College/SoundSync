@@ -18,6 +18,25 @@
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
 }
 
+/* ── Light theme ─────────────────────────────────────────────────────────── */
+[data-theme="light"] {
+  /* Soft blue-slate palette — tinted, not stark white */
+  --color-bg: #e8eef8;
+  --color-surface: #f2f6fd;
+  --color-surface-raised: #dce6f4;
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-accent: #0284c7;
+  --color-text: #1a2744;
+  --color-text-muted: #5b6f8f;
+  --color-border: #c4d3ea;
+  --color-danger: #dc2626;
+  --color-success: #16a34a;
+  --color-warning: #d97706;
+  --shadow-sm: 0 1px 4px rgba(30, 58, 120, 0.1);
+  --shadow-md: 0 4px 16px rgba(30, 58, 120, 0.14);
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
@@ -28,6 +47,9 @@
 ::-webkit-scrollbar-thumb {
   background: var(--color-border);
   border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
 }
 
 /* Utility */

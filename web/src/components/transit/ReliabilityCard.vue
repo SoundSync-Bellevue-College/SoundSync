@@ -329,6 +329,43 @@ watch(() => props.stopId, load, { immediate: true })
   align-items: end;
 }
 
+@media (max-width: 768px) {
+  .reliability-card {
+    border-radius: var(--radius-sm);
+    padding: 0.75rem;
+  }
+
+  .score-row {
+    gap: 0.75rem;
+  }
+
+  .stat-chips {
+    gap: 0.4rem;
+  }
+
+  .chip {
+    flex: 1;
+    min-width: 56px;
+    padding: 0.3rem 0.4rem;
+  }
+
+  .chip-value {
+    font-size: 0.85rem;
+  }
+
+  .bins {
+    gap: 0.4rem;
+  }
+
+  .bin-bar-track {
+    height: 48px;
+  }
+
+  .bin-label {
+    font-size: 0.65rem;
+  }
+}
+
 .bin-cell {
   display: flex;
   flex-direction: column;

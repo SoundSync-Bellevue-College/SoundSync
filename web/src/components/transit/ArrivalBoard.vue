@@ -71,7 +71,7 @@ function formatTime(iso: string): string {
   background: var(--color-surface);
   border-radius: var(--radius-lg);
   padding: 1rem;
-  min-width: 260px;
+  width: 100%;
 }
 
 .board-title {
@@ -105,10 +105,37 @@ function formatTime(iso: string): string {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.4rem 0.5rem;
+  padding: 0.6rem 0.75rem;
   border-radius: var(--radius-sm);
   background: var(--color-bg);
   font-size: 0.85rem;
+}
+
+@media (max-width: 768px) {
+  .arrival-board {
+    padding: 0.75rem 0.5rem;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .arrival-row {
+    padding: 0.75rem 0.75rem;
+    font-size: 0.9rem;
+  }
+
+  .arrival-route {
+    font-size: 0.95rem;
+    min-width: 44px;
+  }
+
+  .arrival-dest {
+    font-size: 0.88rem;
+  }
+
+  .arrival-time {
+    font-size: 0.88rem;
+    gap: 0.35rem;
+  }
 }
 
 .arrival-row.delayed .arrival-time {

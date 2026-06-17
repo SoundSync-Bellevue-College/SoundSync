@@ -177,16 +177,25 @@ const fareBreakdown = computed(() => {
 /* Route option tabs */
 .route-tabs {
   display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
   border-bottom: 1px solid var(--color-border);
+  scrollbar-width: none;
+}
+
+.route-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .route-tab {
-  flex: 1;
+  flex: 0 0 auto;
+  min-width: 80px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.1rem;
-  padding: 0.4rem 0.5rem;
+  padding: 0.4rem 0.75rem;
   background: transparent;
   border: none;
   border-right: 1px solid var(--color-border);
@@ -195,6 +204,7 @@ const fareBreakdown = computed(() => {
   font-weight: 600;
   cursor: pointer;
   transition: background 0.12s, color 0.12s;
+  white-space: nowrap;
 }
 
 .route-tab:last-child {

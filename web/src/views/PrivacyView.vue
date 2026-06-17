@@ -5,7 +5,7 @@
       <div class="page-header">
         <div class="page-badge">Legal</div>
         <h1 class="page-title">Privacy Policy</h1>
-        <p class="page-meta">Effective date: May 25, 2025 &nbsp;·&nbsp; SoundSyncAI · King County, WA</p>
+        <p class="page-meta">Effective date: May 25, 2025 &nbsp;·&nbsp; SoundSync · King County, WA</p>
       </div>
 
       <div class="toc">
@@ -47,9 +47,9 @@ const sections = [
     id: 'overview',
     title: '1. Overview',
     body: `
-      <p>SoundSyncAI ("we", "us", "our") is a student-built transit companion for King County,
+      <p>SoundSync ("we", "us", "our") is a student-built transit companion for King County,
       Washington. This policy explains what personal information we collect when you use
-      <strong>soundsync.live</strong> or the SoundSyncAI mobile app, how we use it, and the
+      <strong>soundsync.live</strong> or the SoundSync mobile app, how we use it, and the
       choices you have.</p>
       <p>We collect the minimum data needed to operate the service. We do not sell your data,
       serve advertisements, or share your information with third-party marketers.</p>
@@ -157,7 +157,7 @@ const sections = [
     id: 'children',
     title: '8. Children\'s Privacy',
     body: `
-      <p>SoundSyncAI is not directed at children under 13. We do not knowingly collect personal
+      <p>SoundSync is not directed at children under 13. We do not knowingly collect personal
       information from children. If we become aware that a child under 13 has provided us with
       personal data, we will delete it promptly.</p>
     `,

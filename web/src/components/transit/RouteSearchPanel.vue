@@ -166,6 +166,7 @@
       v-if="showDetail && routeStore.directionsResult"
       :result="routeStore.directionsResult"
       @close="showDetail = false"
+      @select="onSelectRoute"
     />
   </div>
 </template>
@@ -181,6 +182,13 @@ import RouteDetailModal from './RouteDetailModal.vue'
 const routeStore = useRouteStore()
 const auth = useAuthStore()
 const isPlanning = ref(false)
+
+const emit = defineEmits<{ 'view-on-map': [] }>()
+
+function onSelectRoute() {
+  showDetail.value = false
+  emit('view-on-map')
+}
 const locating = ref(false)
 const showDetail = ref(false)
 const usingCurrentLocation = ref(false)

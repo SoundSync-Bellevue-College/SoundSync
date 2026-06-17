@@ -437,11 +437,14 @@ function delayLvlLabel(val: number): string {
   background: var(--color-surface, #1e293b);
   border: 1px solid var(--color-border, #334155);
   border-radius: 10px;
-  overflow: hidden;
+  overflow: auto;
+  max-height: calc(100vh - 320px);
+  -webkit-overflow-scrolling: touch;
 }
 
 .score-table {
   width: 100%;
+  min-width: 600px;
   border-collapse: collapse;
   font-size: 0.875rem;
 }
@@ -576,6 +579,26 @@ function delayLvlLabel(val: number): string {
 
 /* Crowd source column */
 .col-cs { width: 110px; }
+
+@media (max-width: 768px) {
+  .score-page {
+    padding: 1rem;
+    gap: 1rem;
+  }
+
+  .search-input {
+    width: 100%;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .table-wrap {
+    max-height: calc(100vh - 360px);
+  }
+}
 
 /* States */
 .state-msg {

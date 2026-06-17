@@ -106,9 +106,9 @@ function vehicleSuffix(vehicleId: string): string {
 
 // Fallback colors per GTFS route_type when the route has no custom color
 const TYPE_COLORS: Record<number, { bg: string; text: string }> = {
-  0: { bg: '#22c55e', text: '#ffffff' }, // Tram / Light Rail — green
+  0: { bg: '#38bdf8', text: '#ffffff' }, // Tram / Light Rail — light blue
   1: { bg: '#a855f7', text: '#ffffff' }, // Subway           — purple
-  2: { bg: '#f59e0b', text: '#ffffff' }, // Rail / Train     — amber
+  2: { bg: '#4ade80', text: '#ffffff' }, // Rail / Train     — light green
   3: { bg: '#f97316', text: '#ffffff' }, // Bus              — orange
   4: { bg: '#0ea5e9', text: '#ffffff' }, // Ferry            — cyan
 }

@@ -15,12 +15,15 @@ import NotificationToast from '@/components/common/NotificationToast.vue'
 import { useAuthStore } from '@/stores/authStore'
 import { useNotificationStore } from '@/stores/notificationStore'
 import { useServiceAlertStore } from '@/stores/serviceAlertStore'
+import { useThemeStore } from '@/stores/themeStore'
 
 const auth = useAuthStore()
 const notif = useNotificationStore()
 const serviceAlerts = useServiceAlertStore()
+const themeStore = useThemeStore()
 
 onMounted(() => {
+  themeStore.init()
   serviceAlerts.startPolling()
 })
 
@@ -50,12 +53,13 @@ body,
   height: 100%;
   overflow-x: hidden;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background-color: #0f172a;
-  color: #f1f5f9;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  transition: background-color 0.2s, color 0.2s;
 }
 
 .main-content {
   height: calc(100vh - 60px);
-  overflow: hidden;
+  overflow-y: auto;
 }
 </style>
