@@ -27,6 +27,8 @@ type Config struct {
 	PGDBName   string
 	PGUser     string
 	PGPassword string
+	// Anthropic — transit assistant chatbot
+	AnthropicAPIKey string
 }
 
 func Load() *Config {
@@ -56,11 +58,12 @@ func Load() *Config {
 		OBABaseURL: getEnv("OBA_BASE_URL", "https://api.pugetsound.onebusaway.org"),
 		OBAApiKey:  getEnv("OBA_API_KEY", "TEST"),
 		WSFApiKey:  getEnv("WSF_API_KEY", ""), // optional — WSDOT ferry API access code
-		PGHost:     getEnv("PG_HOST", "localhost"),
-		PGPort:     getEnv("PG_PORT", "5432"),
-		PGDBName:   getEnv("PG_DBNAME", "soundsync"),
-		PGUser:     getEnv("PG_USER", "postgres"),
-		PGPassword: getEnv("PG_PASSWORD", ""),
+		PGHost:          getEnv("PG_HOST", "localhost"),
+		PGPort:          getEnv("PG_PORT", "5432"),
+		PGDBName:        getEnv("PG_DBNAME", "soundsync"),
+		PGUser:          getEnv("PG_USER", "postgres"),
+		PGPassword:      getEnv("PG_PASSWORD", ""),
+		AnthropicAPIKey: getEnv("ANTHROPIC_API_KEY", ""),
 	}
 }
 

@@ -58,6 +58,7 @@ func New(cfg *config.Config, db *mongo.Database, pgDB *sql.DB) http.Handler {
 	reliabilityH := handlers.NewReliabilityHandler(reliabilitySvc)
 	serviceAlertsH := handlers.NewServiceAlertsHandler(serviceAlertsSvc)
 	teamH := handlers.NewTeamHandler(teamRepo)
+	chatH := handlers.NewChatHandler(cfg)
 
 	// JWT middleware factory
 	jwtAuth := middleware.NewJWTAuth(cfg.JWTSecret)
@@ -87,6 +88,9 @@ func New(cfg *config.Config, db *mongo.Database, pgDB *sql.DB) http.Handler {
 
 		// Service alerts (public)
 		r.Get("/service-alerts", serviceAlertsH.GetAlerts)
+
+		// Transit assistant chatbot (public)
+		r.Post("/chat", chatH.Chat)
 
 		// Team (public)
 		r.Get("/team", teamH.GetTeam)
