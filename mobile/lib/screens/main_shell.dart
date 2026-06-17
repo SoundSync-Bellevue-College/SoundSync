@@ -8,6 +8,7 @@ import 'home_screen.dart';
 import 'scores_screen.dart';
 import 'account_screen.dart';
 import 'about_screen.dart';
+import 'chat_screen.dart';
 
 class MainShell extends ConsumerStatefulWidget {
   const MainShell({super.key});
@@ -43,6 +44,8 @@ class _MainShellState extends ConsumerState<MainShell> {
                 onRegister: () => context.push('/register'),
               );
       case 3:
+        body = const ChatScreen();
+      case 4:
         body = const AboutScreen();
       default:
         body = const HomeScreen();
@@ -72,6 +75,11 @@ class _MainShellState extends ConsumerState<MainShell> {
             icon: Icon(Icons.person_outline, color: Colors.white38),
             selectedIcon: Icon(Icons.person, color: Color(0xFF7FDBFF)),
             label: 'Account',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.chat_bubble_outline, color: Colors.white38),
+            selectedIcon: Icon(Icons.chat_bubble, color: Color(0xFF7FDBFF)),
+            label: 'Assistant',
           ),
           NavigationDestination(
             icon: Icon(Icons.info_outline, color: Colors.white38),
