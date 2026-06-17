@@ -51,7 +51,7 @@ class TransitRouteSheet extends StatelessWidget {
                     child: Text(
                       'Routes to $destinationName',
                       style: const TextStyle(
-                          color: Colors.white,
+                          color: Color(0xFF0D1B2A),
                           fontSize: 16,
                           fontWeight: FontWeight.bold),
                       maxLines: 1,
@@ -275,7 +275,7 @@ class _TransitPill extends StatelessWidget {
           const SizedBox(width: 5),
           Text(label,
               style: const TextStyle(
-                  color: Colors.white,
+                  color: Color(0xFF0D1B2A),
                   fontSize: 13,
                   fontWeight: FontWeight.bold)),
           if (stops.isNotEmpty) ...[
@@ -486,7 +486,7 @@ class _WalkStepRowState extends State<_WalkStepRow> {
                               const SizedBox(width: 4),
                               Text('$temp°F',
                                   style: const TextStyle(
-                                      color: Colors.white,
+                                      color: Color(0xFF0D1B2A),
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600)),
                             ],
@@ -609,7 +609,7 @@ class _TransitStepRow extends ConsumerWidget {
                           Text(
                             stopName,
                             style: const TextStyle(
-                                color: Colors.white,
+                                color: Color(0xFF0D1B2A),
                                 fontSize: 17,
                                 fontWeight: FontWeight.bold),
                           ),
@@ -734,7 +734,7 @@ class _TransitStepRow extends ConsumerWidget {
                         child: Text(
                           step.lineShortName ?? step.lineName ?? '?',
                           style: const TextStyle(
-                              color: Colors.white,
+                              color: Color(0xFF0D1B2A),
                               fontWeight: FontWeight.bold,
                               fontSize: 13),
                         ),

@@ -121,30 +121,6 @@ class _TripAssistantScreenState extends ConsumerState<TripAssistantScreen> {
         children: [
           _buildHeader(context),
 
-          // Demo-mode disclaimer banner
-          Container(
-            width: double.infinity,
-            color: const Color(0xFFFEF3C7),
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-            child: const Row(
-              children: [
-                Text('⚙️', style: TextStyle(fontSize: 14)),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    "Demo mode — answers use real transit data, full AI is "
-                    "being deployed.",
-                    style: TextStyle(
-                      color: Color(0xFF92400E),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
           // Chat scroll area
           Expanded(
             child: ListView.builder(

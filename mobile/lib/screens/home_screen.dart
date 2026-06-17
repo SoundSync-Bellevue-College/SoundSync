@@ -543,13 +543,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     label: 'Ask',
                     onTap: () => context.push('/assistant'),
                   ),
-                  const SizedBox(height: 10),
-                  _FloatingChip(
-                    emoji: '📍',
-                    label: 'Nearby',
-                    filled: true,
-                    onTap: () {},
-                  ),
                 ],
               ),
             ),

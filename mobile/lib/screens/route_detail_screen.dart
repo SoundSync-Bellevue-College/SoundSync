@@ -66,6 +66,11 @@ class _RouteDetailScreenState extends ConsumerState<RouteDetailScreen>
   double _busPosition = 0.18;
   Timer? _timer;
 
+  // Cached upcoming arrivals — only refetched when location changes meaningfully.
+  Future<List<_RouteArrivalRow>>? _arrivalsFuture;
+  double? _lastArrivalsLat;
+  double? _lastArrivalsLng;
+
   @override
   void initState() {
     super.initState();
@@ -767,7 +772,7 @@ class _RouteDetailScreenState extends ConsumerState<RouteDetailScreen>
       );
     }
     return FutureBuilder<List<_RouteArrivalRow>>(
-      future: _loadUpcomingArrivals(userPos.latitude, userPos.longitude),
+      future: _maybeRefreshArrivalsFuture(userPos.latitude, userPos.longitude),
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
           return _buildArrivalsShell(
@@ -936,6 +941,27 @@ class _RouteDetailScreenState extends ConsumerState<RouteDetailScreen>
 
   // Loads upcoming arrivals for this route at nearby stops.
   // Two-stage fetch: stops first, then arrivals per matching stop.
+  // Returns a cached Future when called repeatedly with the same-ish location,
+  // so FutureBuilder does not flip to "waiting" on every rebuild.
+  Future<List<_RouteArrivalRow>> _maybeRefreshArrivalsFuture(double lat, double lng) {
+    const double thresholdMeters = 50; // refetch only when user moves > 50m
+    final hasCache = _arrivalsFuture != null &&
+        _lastArrivalsLat != null && _lastArrivalsLng != null;
+    bool needsRefresh = !hasCache;
+    if (hasCache) {
+      final dLat = (lat - _lastArrivalsLat!) * 111320; // ~m per deg
+      final dLng = (lng - _lastArrivalsLng!) * 111320 * 0.7; // approx at PNW lat
+      final movedM = (dLat * dLat + dLng * dLng);
+      if (movedM > thresholdMeters * thresholdMeters) needsRefresh = true;
+    }
+    if (needsRefresh) {
+      _arrivalsFuture = _loadUpcomingArrivals(lat, lng);
+      _lastArrivalsLat = lat;
+      _lastArrivalsLng = lng;
+    }
+    return _arrivalsFuture!;
+  }
+
   Future<List<_RouteArrivalRow>> _loadUpcomingArrivals(
       double userLat, double userLng) async {
     final dio = buildApiClient();

@@ -30,7 +30,7 @@ func (h *TransitHandler) GetNearbyStops(w http.ResponseWriter, r *http.Request) 
 	lng, _ := strconv.ParseFloat(q.Get("lng"), 64)
 	radius, _ := strconv.Atoi(q.Get("radius"))
 	if radius == 0 {
-		radius = 500
+		radius = 2000
 	}
 
 	stops, err := h.transitSvc.GetNearbyStops(r.Context(), lat, lng, radius)
