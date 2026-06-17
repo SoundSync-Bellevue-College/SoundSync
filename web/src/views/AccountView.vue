@@ -95,6 +95,17 @@
         </div>
       </section>
 
+      <!-- Sign Out -->
+      <section class="section">
+        <div class="setting-row">
+          <div class="setting-label">
+            <span class="setting-name">Sign Out</span>
+            <span class="setting-desc">Sign out of your account on this device</span>
+          </div>
+          <button class="signout-btn" @click="handleSignOut">Sign Out</button>
+        </div>
+      </section>
+
       <!-- Delete Account -->
       <section class="section">
         <div class="setting-row danger-row">
@@ -290,6 +301,12 @@ function relativeTime(iso: string): string {
   if (hrs < 24) return `${hrs}h ago`
   const days = Math.floor(hrs / 24)
   return `${days}d ago`
+}
+
+// ── Sign out ──────────────────────────────────────────────────────────────────
+function handleSignOut() {
+  auth.logout()
+  router.push('/')
 }
 
 // ── Delete Account modal ──────────────────────────────────────────────────────
@@ -513,6 +530,25 @@ async function confirmDeleteAccount() {
 
 .toggle input:checked ~ .toggle-track .toggle-thumb {
   transform: translateX(20px);
+}
+
+/* Sign out button */
+.signout-btn {
+  padding: 0.4rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.signout-btn:hover {
+  background: var(--color-surface);
+  border-color: var(--color-text-muted);
 }
 
 /* Danger row (delete account) */

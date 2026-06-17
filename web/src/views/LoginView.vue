@@ -3,7 +3,7 @@
     <div class="auth-card">
       <div class="auth-brand">
         <span class="brand-icon">🚌</span>
-        <span class="brand-name">SoundSyncAI</span>
+        <span class="brand-name">SoundSync</span>
       </div>
 
       <h1 class="auth-title">Sign In</h1>

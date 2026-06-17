@@ -15,6 +15,7 @@ export const useMapStore = defineStore('map', () => {
   const isLoading = ref(false)
   const error = ref<string | null>(null)
   const showOnlyPlanned = ref(false)
+  const showAllLive = ref(false)
   const vehicleTypeFilter = ref<'ALL' | 'BUS' | 'RAIL'>('ALL')
   const mapTypeId = ref<'roadmap' | 'satellite' | 'hybrid' | 'terrain'>('hybrid')
   const showTransitLayer = ref(false)
@@ -82,6 +83,7 @@ export const useMapStore = defineStore('map', () => {
     isLoading,
     error,
     showOnlyPlanned,
+    showAllLive,
     vehicleTypeFilter,
     mapTypeId,
     showTransitLayer,

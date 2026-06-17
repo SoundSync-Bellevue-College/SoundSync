@@ -39,6 +39,9 @@
             {{ route.shortName }}
           </span>
           <span class="route-type-label">{{ routeTypeName(route.routeType) }}</span>
+          <span v-if="vehicleCountByRoute.get(route.id)" class="vehicle-count">
+            🚌 {{ vehicleCountByRoute.get(route.id) }} active
+          </span>
         </button>
       </div>
     </div>
@@ -50,6 +53,18 @@ import { ref, computed } from 'vue'
 import { useMapStore } from '@/stores/mapStore'
 import { getRouteLookup } from '@/services/routeLookup'
 
+const mapStore = useMapStore()
+
+// Count active vehicles per numeric route ID
+const vehicleCountByRoute = computed(() => {
+  const counts = new Map<string, number>()
+  for (const v of mapStore.vehicles) {
+    const id = v.routeId.includes('_') ? v.routeId.split('_').pop()! : v.routeId
+    counts.set(id, (counts.get(id) ?? 0) + 1)
+  }
+  return counts
+})
+
 interface RouteOption {
   id: string        // numeric OBA id e.g. "100001"
   shortName: string
@@ -58,7 +73,6 @@ interface RouteOption {
   routeType: number
 }
 
-const mapStore = useMapStore()
 const query = ref('')
 const showDropdown = ref(false)
 const highlightIdx = ref(0)
@@ -223,10 +237,16 @@ function clearTracking() {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   box-shadow: 0 8px 24px rgba(0,0,0,0.3);
-  z-index: 50;
-  overflow: hidden;
-  max-height: 280px;
+  z-index: 200;
+  max-height: 200px;
   overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+@media (max-width: 768px) {
+  .dropdown {
+    max-height: 140px;
+  }
 }
 
 .dropdown-item {
@@ -260,5 +280,14 @@ function clearTracking() {
 .route-type-label {
   font-size: 0.78rem;
   color: var(--color-text-muted);
+  flex: 1;
+}
+
+.vehicle-count {
+  font-size: 0.72rem;
+  color: #22c55e;
+  font-weight: 600;
+  white-space: nowrap;
+  margin-left: auto;
 }
 </style>

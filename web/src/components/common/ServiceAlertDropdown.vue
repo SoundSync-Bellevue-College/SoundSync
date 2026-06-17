@@ -144,6 +144,16 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside))
   overflow: hidden;
 }
 
+@media (max-width: 600px) {
+  .alert-dropdown {
+    position: fixed;
+    top: 68px;
+    left: 0.75rem;
+    right: 0.75rem;
+    width: auto;
+  }
+}
+
 .alert-header {
   display: flex;
   align-items: center;

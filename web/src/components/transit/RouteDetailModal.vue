@@ -118,6 +118,17 @@
           </div>
         </div>
 
+        <!-- Select route footer -->
+        <div class="modal-select-footer">
+          <button class="btn-select-route" @click="$emit('select')">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
+              fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+            View on Map
+          </button>
+        </div>
+
         <!-- Footer: fare breakdown -->
         <div v-if="fareBreakdown" class="modal-footer">
           <span class="fare-label">Estimated Fare (ORCA)</span>
@@ -171,7 +182,7 @@ const props = defineProps<{
   result: google.maps.DirectionsResult
 }>()
 
-defineEmits<{ close: [] }>()
+defineEmits<{ close: [], select: [] }>()
 
 const leg = computed(() => props.result.routes[routeStore.selectedRouteIndex]?.legs[0])
 
@@ -531,6 +542,34 @@ const fareBreakdown = computed(() => {
 
 .dot    { opacity: 0.4; }
 .agency { color: var(--color-text-muted); }
+
+/* ── Select route footer ── */
+.modal-select-footer {
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.btn-select-route {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-select-route:hover {
+  background: var(--color-primary-hover);
+}
 
 /* ── Footer ── */
 .modal-footer {
