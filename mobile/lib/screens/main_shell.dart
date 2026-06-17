@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../providers/auth_provider.dart';
+import '../providers/chat_route_provider.dart';
 import '../services/routes_lookup.dart';
 import 'home_screen.dart';
 import 'scores_screen.dart';
@@ -18,8 +19,6 @@ class MainShell extends ConsumerStatefulWidget {
 }
 
 class _MainShellState extends ConsumerState<MainShell> {
-  int _index = 0;
-
   @override
   void initState() {
     super.initState();
@@ -29,9 +28,10 @@ class _MainShellState extends ConsumerState<MainShell> {
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
+    final tabIndex = ref.watch(activeTabProvider);
 
     Widget body;
-    switch (_index) {
+    switch (tabIndex) {
       case 0:
         body = const HomeScreen();
       case 1:
@@ -57,8 +57,8 @@ class _MainShellState extends ConsumerState<MainShell> {
         backgroundColor: const Color(0xFF0D1B2A),
         surfaceTintColor: Colors.transparent,
         indicatorColor: const Color(0xFF7FDBFF).withOpacity(0.15),
-        selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
+        selectedIndex: tabIndex,
+        onDestinationSelected: (i) => ref.read(activeTabProvider.notifier).state = i,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         destinations: const [
           NavigationDestination(
