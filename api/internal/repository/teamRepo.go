@@ -36,13 +36,15 @@ func (r *TeamRepo) GetAll(ctx context.Context) ([]models.TeamMember, error) {
 func (r *TeamRepo) Upsert(ctx context.Context, m models.TeamMember) error {
 	filter := bson.M{"name": m.Name}
 	update := bson.M{"$set": bson.M{
-		"pronouns":   m.Pronouns,
-		"role":       m.Role,
-		"photo_url":  m.PhotoURL,
-		"quote":      m.Quote,
-		"linkedin":   m.LinkedIn,
-		"github":     m.GitHub,
-		"sort_order": m.SortOrder,
+		"pronouns":    m.Pronouns,
+		"role":        m.Role,
+		"photo_url":   m.PhotoURL,
+		"quote":       m.Quote,
+		"description": m.Description,
+		"linkedin":    m.LinkedIn,
+		"github":      m.GitHub,
+		"instagram":   m.Instagram,
+		"sort_order":  m.SortOrder,
 	}, "$setOnInsert": bson.M{"_id": primitive.NewObjectID()}}
 	opts := options.Update().SetUpsert(true)
 	_, err := r.col.UpdateOne(ctx, filter, update, opts)
