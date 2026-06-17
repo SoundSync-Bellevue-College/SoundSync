@@ -100,7 +100,7 @@ async function send() {
 .chatbot-wrapper {
   position: fixed;
   bottom: 1.5rem;
-  right: 1.5rem;
+  right: 4rem;
   z-index: 1000;
   display: flex;
   flex-direction: column;
