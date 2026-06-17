@@ -201,7 +201,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRouteStore } from '@/stores/routeStore'
 import { useAuthStore } from '@/stores/authStore'
 import { loadGoogleMaps } from '@/services/mapsService'
@@ -432,6 +432,10 @@ watch(() => props.pendingOrigin, (orig) => {
     geometry: { location: new google.maps.LatLng(orig.lat, orig.lng) },
   }
   usingCurrentLocation.value = false
+  // Auto-trigger directions once both origin and destination are ready
+  if (props.pendingDestination) {
+    nextTick(() => planRoute())
+  }
 })
 
 onMounted(async () => {
