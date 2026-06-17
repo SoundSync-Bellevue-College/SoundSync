@@ -125,6 +125,9 @@
     <!-- Backdrop (mobile only) -->
     <div v-if="sheetOpen" class="sheet-backdrop" @click="sheetOpen = false"></div>
 
+    <!-- Transit assistant chatbot -->
+    <ChatBot />
+
     <!-- First-time tutorial callout -->
     <Transition name="tutorial-fade">
       <div v-if="showTutorial" class="tutorial-callout">
@@ -148,6 +151,7 @@ import WeatherWidget from '@/components/weather/WeatherWidget.vue'
 import ArrivalBoard from '@/components/transit/ArrivalBoard.vue'
 import StopAlertBanner from '@/components/transit/StopAlertBanner.vue'
 import RouteDetailModal from '@/components/transit/RouteDetailModal.vue'
+import ChatBot from '@/components/common/ChatBot.vue'
 import { useMapStore } from '@/stores/mapStore'
 import { useServiceAlertStore } from '@/stores/serviceAlertStore'
 import { useRouteStore } from '@/stores/routeStore'
