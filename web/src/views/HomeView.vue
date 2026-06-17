@@ -269,6 +269,19 @@ watch(activeTab, (tab) => {
   padding-top: 0.75rem;
 }
 
+/* Desktop: hide tabs when stop is selected, let stop panel scroll */
+.sidebar.has-stop .tab-bar,
+.sidebar.has-stop .tab-content {
+  display: none;
+}
+
+.sidebar.has-stop .stop-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75rem 1rem 1.5rem;
+  border-top: none;
+}
+
 .stop-panel-header {
   display: flex;
   align-items: center;

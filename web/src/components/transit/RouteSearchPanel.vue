@@ -5,35 +5,33 @@
     <!-- From field -->
     <div class="field">
       <label class="field-label">From</label>
-      <div class="input-wrap">
-        <span class="input-icon">📍</span>
-        <input
-          ref="originInputEl"
-          class="field-input"
-          type="text"
-          :placeholder="locating ? 'Detecting location…' : 'Starting point…'"
-          autocomplete="off"
-        />
+      <div class="from-row">
+        <button
+          class="current-location-chip"
+          :class="{ active: usingCurrentLocation, loading: locating }"
+          :disabled="locating"
+          title="Use my location"
+          @click="useCurrentLocation"
+        >
+          <span class="chip-dot">{{ locating ? '…' : '📍' }}</span>
+        </button>
+        <div class="input-wrap">
+          <input
+            ref="originInputEl"
+            class="field-input"
+            type="text"
+            :placeholder="locating ? 'Detecting…' : 'Starting point…'"
+            autocomplete="off"
+          />
+        </div>
+        <button class="btn-swap" title="Swap" @click="swapPlaces">⇅</button>
       </div>
-      <button
-        class="current-location-chip"
-        :class="{ active: usingCurrentLocation, loading: locating }"
-        :disabled="locating"
-        @click="useCurrentLocation"
-      >
-        <span class="chip-dot">{{ locating ? '…' : '📍' }}</span>
-        {{ locating ? 'Detecting…' : 'Current location' }}
-      </button>
     </div>
-
-    <!-- Swap button -->
-    <button class="btn-swap" title="Swap" @click="swapPlaces">⇅</button>
 
     <!-- To field -->
     <div class="field">
       <label class="field-label">To</label>
       <div class="input-wrap">
-        <span class="input-icon">🏁</span>
         <input
           ref="destInputEl"
           class="field-input"
@@ -245,7 +243,7 @@ const savedLocations = computed(() =>
 function applyFavoriteLocation(loc: (typeof routeStore.favorites)[number]) {
   if (!destInputEl.value) return
   destInputEl.value.value = loc.label
-  destPlace = {
+  destPlace.value = {
     name: loc.label,
     geometry: { location: new google.maps.LatLng(loc.destination.lat, loc.destination.lng) },
     formatted_address: loc.label,
@@ -258,16 +256,16 @@ const destSaved = ref(false)
 const savingDest = ref(false)
 
 async function saveDestination() {
-  if (!destPlace?.geometry?.location) return
+  if (!destPlace.value?.geometry?.location) return
   savingDest.value = true
   try {
     await routeStore.addFavorite({
-      label: destPlace.name || destInputEl.value?.value || 'Saved Location',
+      label: destPlace.value.name || destInputEl.value?.value || 'Saved Location',
       origin: { name: '', lat: 0, lng: 0 },
       destination: {
-        name: destPlace.name || destInputEl.value?.value || '',
-        lat: destPlace.geometry.location.lat(),
-        lng: destPlace.geometry.location.lng(),
+        name: destPlace.value.name || destInputEl.value?.value || '',
+        lat: destPlace.value.geometry.location.lat(),
+        lng: destPlace.value.geometry.location.lng(),
       },
       transitRouteIds: [],
     })
@@ -363,7 +361,7 @@ function buildTransitTime(): Date {
 // ── Google Maps autocomplete setup ───────────────────────────────────────────
 
 let originPlace: google.maps.places.PlaceResult | null = null
-let destPlace:   google.maps.places.PlaceResult | null = null
+const destPlace = ref<google.maps.places.PlaceResult | null>(null)
 let originAC:    google.maps.places.Autocomplete | null = null
 let destAC:      google.maps.places.Autocomplete | null = null
 
@@ -384,7 +382,7 @@ onMounted(async () => {
   if (destInputEl.value) {
     destAC = new google.maps.places.Autocomplete(destInputEl.value, AC_OPTIONS)
     destAC.addListener('place_changed', () => {
-      destPlace = destAC!.getPlace()
+      destPlace.value = destAC!.getPlace()
       destSaved.value = false
     })
   }
@@ -399,12 +397,12 @@ function swapPlaces() {
   originInputEl.value.value = destInputEl.value.value
   destInputEl.value.value = tmp
   const tmpPlace = originPlace
-  originPlace = destPlace
-  destPlace = tmpPlace
+  originPlace = destPlace.value
+  destPlace.value = tmpPlace
 }
 
 function planRoute() {
-  if (!originPlace?.geometry?.location || !destPlace?.geometry?.location) {
+  if (!originPlace?.geometry?.location || !destPlace.value?.geometry?.location) {
     routeStore.setError('Please select both locations from the autocomplete dropdown.')
     return
   }
@@ -442,7 +440,7 @@ function planRoute() {
   service.route(
     {
       origin: originPlace.geometry.location,
-      destination: destPlace.geometry.location,
+      destination: destPlace.value!.geometry!.location,
       travelMode: google.maps.TravelMode.TRANSIT,
       transitOptions,
       provideRouteAlternatives: true,
@@ -515,7 +513,7 @@ function planRoute() {
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  padding: 0.5rem 2rem 0.5rem 2rem;
+  padding: 0.5rem 2rem 0.5rem 0.6rem;
   color: var(--color-text);
   font-size: 0.875rem;
   transition: border-color 0.15s;
@@ -526,21 +524,35 @@ function planRoute() {
   border-color: var(--color-primary);
 }
 
+.from-row {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.from-row .input-wrap {
+  flex: 1;
+}
+
 .btn-swap {
-  align-self: flex-end;
+  flex-shrink: 0;
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  padding: 0.2rem 0.6rem;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 1rem;
   color: var(--color-text-muted);
   cursor: pointer;
-  transition: color 0.15s;
-  margin-top: -0.2rem;
+  transition: color 0.15s, border-color 0.15s;
 }
 
 .btn-swap:hover {
   color: var(--color-primary);
+  border-color: var(--color-primary);
 }
 
 /* ── Time section ────────────────────────────────────────────────────────── */
@@ -635,16 +647,16 @@ function planRoute() {
   align-items: center;
   gap: 0.15rem;
   padding: 0.3rem 0.45rem;
-  background: #1e293b;
+  background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   flex: 1;
 }
 
 .time-select {
-  background: #1e293b;
+  background: var(--color-bg);
   border: none;
-  color: #f1f5f9;
+  color: var(--color-text);
   font-size: 0.82rem;
   font-weight: 500;
   cursor: pointer;
@@ -660,8 +672,8 @@ function planRoute() {
 }
 
 .time-select option {
-  background: #1e293b;
-  color: #f1f5f9;
+  background: var(--color-bg);
+  color: var(--color-text);
 }
 
 .time-colon {
@@ -796,9 +808,11 @@ function planRoute() {
 .current-location-chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
-  margin-top: 0.35rem;
-  padding: 0.2rem 0.6rem;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: 999px;
