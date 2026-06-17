@@ -85,7 +85,7 @@ async function send() {
 
   try {
     const { data } = await api.post('/chat', { messages: messages.value })
-    messages.value.push({ role: 'assistant', content: data.data.message })
+    messages.value.push({ role: 'assistant', content: data.message })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Something went wrong. Please try again.'
     messages.value.push({ role: 'assistant', content: msg })
