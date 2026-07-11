@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/chat_service.dart';
+import '../services/geocoding_service.dart';
+import '../providers/chat_route_provider.dart';
 
-class ChatScreen extends StatefulWidget {
+class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({super.key});
 
   @override
-  State<ChatScreen> createState() => _ChatScreenState();
+  ConsumerState<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _service = ChatService();
   final _messages = <ChatMessage>[];
   final _controller = TextEditingController();
@@ -31,8 +34,29 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
 
     try {
-      final reply = await _service.send(_messages);
-      setState(() => _messages.add(ChatMessage(role: 'assistant', content: reply)));
+      final response = await _service.send(_messages);
+      setState(() => _messages.add(ChatMessage(role: 'assistant', content: response.message)));
+
+      if (response.route != null) {
+        final route = response.route!;
+        final results = await Future.wait([
+          GeocodingService.geocode(route.origin),
+          GeocodingService.geocode(route.destination),
+        ]);
+        final originResult = results[0];
+        final destResult = results[1];
+        if (originResult != null && destResult != null && mounted) {
+          ref.read(pendingChatRouteProvider.notifier).state = PendingChatRoute(
+            originName: route.origin,
+            originLat: originResult.lat,
+            originLng: originResult.lng,
+            destName: route.destination,
+            destLat: destResult.lat,
+            destLng: destResult.lng,
+          );
+          ref.read(activeTabProvider.notifier).state = 0; // switch to Map tab
+        }
+      }
     } catch (e) {
       setState(() => _messages.add(ChatMessage(
         role: 'assistant',

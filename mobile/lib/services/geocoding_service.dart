@@ -62,6 +62,27 @@ class GeocodingService {
     }
   }
 
+  /// Geocodes a free-text [address] to coordinates.
+  static Future<GeocodingResult?> geocode(String address) async {
+    try {
+      final resp = await _dio.get('/geocode/json', queryParameters: {
+        'address': address,
+        'key': _mapsApiKey,
+        'components': 'country:us',
+      });
+      if (resp.data['status'] != 'OK') return null;
+      final result = (resp.data['results'] as List).first as Map<String, dynamic>;
+      final loc = result['geometry']['location'] as Map<String, dynamic>;
+      return GeocodingResult(
+        result['formatted_address'] as String,
+        (loc['lat'] as num).toDouble(),
+        (loc['lng'] as num).toDouble(),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Resolves a [placeId] to coordinates + formatted address.
   static Future<GeocodingResult?> placeDetails(String placeId) async {
     try {

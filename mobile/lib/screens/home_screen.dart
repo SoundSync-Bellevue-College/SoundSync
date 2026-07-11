@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../providers/transit_provider.dart';
 import '../providers/location_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/chat_route_provider.dart';
 import '../services/api_client.dart';
 import '../services/geocoding_service.dart';
 import '../services/route_planning_service.dart';
@@ -178,6 +179,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     RoutesLookup.instance.load();
     _originFocus.addListener(() {
       if (mounted) setState(() => _originFieldActive = _originFocus.hasFocus);
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.listenManual(pendingChatRouteProvider, (_, route) {
+        if (route == null || !mounted) return;
+        _originCtrl.text = route.originName;
+        _originLat = route.originLat;
+        _originLng = route.originLng;
+        _showRouteSheet(route.destName, route.destLat, route.destLng);
+        ref.read(pendingChatRouteProvider.notifier).state = null;
+      });
     });
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
